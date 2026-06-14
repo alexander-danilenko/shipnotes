@@ -1,0 +1,25 @@
+# markdownlint-cli2 — https://github.com/DavidAnson/markdownlint-cli2
+# Lints every Markdown file in the repo; pass --fix to auto-format:
+#   npx markdownlint-cli2 --fix      # auto-format + report what it can't fix
+#   npx markdownlint-cli2            # check only (no changes)
+
+# Files to lint.
+globs:
+  - "**/*.md"
+
+# Rule settings — https://github.com/DavidAnson/markdownlint/blob/main/doc/Rules.md
+config:
+  default: true
+  # House style is one line per paragraph (no hard-wrapping), so the
+  # maximum-line-length rule is off. (The linter can permit long lines but cannot
+  # enforce single-line paragraphs — that part stays a documented convention.)
+  MD013: false
+  # Table cell padding is cosmetic and --fix cannot normalize delimiter rows, so
+  # this rule only produces unfixable noise. GitHub renders tables fine regardless.
+  MD060: false
+
+# Generated, transient, or byte-locked files we never lint or rewrite.
+ignores:
+  - "node_modules"
+  - ".remember"
+  - "testdata"

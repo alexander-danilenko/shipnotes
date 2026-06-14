@@ -1,0 +1,44 @@
+# EditorConfig — https://editorconfig.org
+# Editor hints only. The real arbiters of Go style remain gofmt/gofumpt and
+# golangci-lint; nothing here reformats Go code.
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 2
+
+# Go is tab-indented (gofmt's choice — do not switch to spaces, it would fight
+# gofmt). The 120 ruler matches the `lll` linter in .golangci.yml.
+[*.go]
+indent_style = tab
+indent_size = 4
+max_line_length = 120
+
+[*.{yml,yaml,json}]
+indent_style = space
+indent_size = 2
+
+[Makefile]
+indent_style = tab
+
+# Output contract: the template and golden files are locked byte-for-byte by the
+# golden tests. Do not trim whitespace or touch final newlines here, or the
+# goldens drift and tests break.
+[internal/infrastructure/markdown/templates/*.tmpl]
+trim_trailing_whitespace = false
+insert_final_newline = false
+
+[testdata/golden/*.golden]
+trim_trailing_whitespace = false
+insert_final_newline = false
+
+# Markdown: one line per paragraph (no hard-wrapping) — so disable the column
+# ruler and let editors soft-wrap. Trailing spaces can be a hard line break, so
+# don't strip them.
+[*.md]
+max_line_length = off
+trim_trailing_whitespace = false
