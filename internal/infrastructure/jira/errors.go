@@ -47,10 +47,16 @@ func (e *NetworkError) Unwrap() error { return e.Cause }
 // gives troubleshooting guidance for the most common credential and access
 // problems.
 type APIError struct {
-	Status          int
-	StatusText      string
-	RequestURL      string
+	Status     int
+	StatusText string
+	RequestURL string
+	// IssueKeys is the key list of a key-lookup request, or nil for a free-form
+	// JQL search. JQL is the query actually sent: the generated key IN (...)
+	// clause for a key lookup, or the user's query for a --jql search. Both are
+	// populated on the key-lookup path; requestContext prefers IssueKeys, so a
+	// key lookup shows the keys and a --jql search shows the query.
 	IssueKeys       []string
+	JQL             string
 	ResponseDetails string
 }
 
@@ -64,7 +70,7 @@ func (e *APIError) Error() string {
 		fmt.Sprintf("Jira API request failed with status %d %s", e.Status, e.StatusText),
 		"",
 		"Request URL: " + e.RequestURL,
-		"Issue keys requested: " + e.displayKeys(),
+		e.requestContext(),
 		"",
 		"Response details:",
 		details,
@@ -83,6 +89,20 @@ func (e *APIError) Error() string {
 	}
 
 	return strings.Join(lines, "\n")
+}
+
+// requestContext describes what was asked for, so a failure points at the cause:
+// the issue keys for a key lookup, or the JQL for a --jql search.
+func (e *APIError) requestContext() string {
+	if len(e.IssueKeys) > 0 {
+		return "Issue keys requested: " + e.displayKeys()
+	}
+
+	if e.JQL != "" {
+		return "JQL query: " + e.JQL
+	}
+
+	return "Issue keys requested: none"
 }
 
 // displayKeys shows the first five requested keys, then a count of the rest, so

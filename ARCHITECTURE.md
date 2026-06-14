@@ -70,7 +70,7 @@ cli  ──▶  application  ──▶  domain  ◀──  infrastructure
 | Layer | Package(s) | Responsibility | May import |
 |-------|-----------|----------------|------------|
 | **domain** | `internal/domain/{commit,issue,notes,report}` | Entities, domain rules, and the **ports** (interfaces) the core needs. | stdlib + other domain packages only |
-| **application** | `internal/application` | Orchestrates the use case through ports. Owns the `Writer` and `IssueIDProvider` ports. | domain |
+| **application** | `internal/application` | Orchestrates the use case through ports. Owns the `Writer` and `IssueSearcher` ports. | domain |
 | **infrastructure** | `internal/infrastructure/{git,jira,markdown,config,terminal,fileoutput}` | Adapters implementing the ports (git, Jira, Markdown, config, terminal, file output). | domain |
 | **cli** | `internal/cli` | Interface layer + composition root: parse args, build adapters, run, present. The only package that imports every layer. | all |
 
@@ -80,16 +80,16 @@ cli  ──▶  application  ──▶  domain  ◀──  infrastructure
 |------------------|-------------|--------------------------|
 | `commit.Repository` (`Validate`, `Log`) | `domain/commit/repository.go` | `infrastructure/git` (`repository.go`, `parser.go`) |
 | `issue.Provider` (`LoadByKeys`) | `domain/issue/provider.go` | `infrastructure/jira` (`client.go`, `types.go`, `errors.go`) |
+| `application.IssueSearcher` (`SearchByJQL`) | `application/app.go` | `infrastructure/jira` (`client.go`) |
 | `notes.Renderer` (`Render`) | `domain/notes/renderer.go` | `infrastructure/markdown` (`renderer.go` + `templates/shipnotes.tmpl`) |
 | `report.Reporter` | `domain/report/reporter.go` | `infrastructure/terminal` (`terminal.go`) |
 | `application.Writer` (`Write`) | `application/app.go` | `infrastructure/fileoutput` (`writer.go`) |
-| `application.IssueIDProvider` (`ForIssueIDs`) | `application/app.go` | `cli` (`prompt.go`) |
 
 ### Level 2 — domain internals
 
 - **`notes.Builder`** (`domain/notes/builder.go`) — the domain service that turns commits + issues into the `notes.ReleaseNotes` model. Depends on `issue.Provider` and `report.Reporter` ports.
 - **`notes` model** (`domain/notes/model.go`) — `ReleaseNotes`, `HeaderData`, `CommitView`, `IssueView`, `StatusGroup`, `SummaryData`, plus `Coordinates` (repo/Jira base URLs as a domain value object). The JSON tags double as the on-disk shape of the golden-test fixtures.
-- **`commit` / `issue` entities** — `Commit` (with revert/reapply/key rules) and `Issue` (with issue-key parsing).
+- **`commit` / `issue` entities** — `Commit` (with revert/reapply/key rules) and `Issue` (the loaded issue's key, title, and status).
 
 ### Supporting infrastructure (non-port helpers)
 
@@ -107,10 +107,10 @@ flags ─▶ validate commit ─▶ git log ─▶ parse commits ─▶ load Jir
 
 Step by step:
 
-1. **`cli.Run`** parses args, resolves `--ids` (fail fast), resolves the repo dir, sets up a signal-cancellable `context.Context`.
+1. **`cli.Run`** parses args (including the optional `--jql` query), resolves the repo dir, sets up a signal-cancellable `context.Context`.
 2. **`loadSettings`** infers GitHub org/repo/base-URL from the git remote, then `config.Load` reads + validates env (real env always wins over `.env`).
 3. **`buildService`** (composition root) wires the concrete adapters into `application.Service`.
-4. **`Service.Run`**: `repo.Validate` → `repo.Log` → (if `--ids` not given) `prompt.ForIssueIDs` → `builder.Build` (calls `issue.Provider.LoadByKeys`) → `renderer.Render` → `writer.Write`.
+4. **`Service.Run`**: `repo.Validate` → `repo.Log` → (if `--jql` given) `searcher.SearchByJQL` → `builder.Build` (calls `issue.Provider.LoadByKeys`) → `renderer.Render` → `writer.Write`.
 5. **`cli.generate`** presents the result (commit count + output path) and returns the process exit code.
 
 **Cancellation:** `SIGINT`/`SIGTERM` cancels the context, which propagates into git and Jira calls.
@@ -140,6 +140,7 @@ Step by step:
 | **Golden-file tests for output** | Treats rendered Markdown as a contract; any change is a reviewed diff. |
 | **Infer repo coordinates from the git remote** | Minimizes required configuration to the three Jira variables. |
 | **Workflow-agnostic status grouping** | Works on any Jira setup without per-project config. |
+| **`--jql` as the sole release-issue source (no `--ids`, no interactive prompt)** | One non-interactive, script-friendly input; JQL expresses both explicit key lists (`key IN (…)`) and richer selections (`fixVersion`, `project`). The Jira search reuses the existing `/search/jql` adapter. Omitting `--jql` falls back to summarizing every issue in the commit range. |
 | **Release via GoReleaser + GitHub Actions (tag-triggered)** | Reproducible cross-platform binaries with checksums on every `v*` tag, with no hand-built release steps; the tooling is CI-only and keeps the binary dependency-free. |
 
 ## 10. Quality requirements

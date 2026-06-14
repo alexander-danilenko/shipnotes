@@ -3,7 +3,7 @@
 //
 // Usage:
 //
-//	shipnotes <commit_hash> [-o output.md] [--repo-dir DIR] [--ids "ABC-1,ABC-2"]
+//	shipnotes <commit_hash> [-o output.md] [--repo-dir DIR] [--jql "key IN (ABC-1, ABC-2)"]
 //
 // It is a single, dependency-free binary: the only thing it needs at runtime is
 // the git command and network access to the Jira REST API.

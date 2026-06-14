@@ -24,12 +24,12 @@ type Writer interface {
 	Write(content, path string) (string, error)
 }
 
-// IssueIDProvider obtains the release issue IDs interactively, used only when
-// the caller did not pass them. The cli prompt implements it. Keeping it behind
-// a port lets the use case ask for input at the right moment (after the commits
-// are fetched) without the application layer depending on the terminal.
-type IssueIDProvider interface {
-	ForIssueIDs() ([]string, error)
+// IssueSearcher resolves a JQL query into the keys of the issues it matches,
+// used only when the caller passed --jql. The Jira client implements it. Keeping
+// it behind a port lets the use case turn the query into the release issue list
+// without the application layer depending on the Jira adapter.
+type IssueSearcher interface {
+	SearchByJQL(ctx context.Context, jql string) ([]string, error)
 }
 
 // Service runs the shipnotes use case. Build one with New.
@@ -38,7 +38,7 @@ type Service struct {
 	builder    *notes.Builder
 	renderer   notes.Renderer
 	writer     Writer
-	prompt     IssueIDProvider
+	searcher   IssueSearcher
 	coords     notes.Coordinates
 	workingDir string
 }
@@ -49,7 +49,7 @@ func New(
 	builder *notes.Builder,
 	renderer notes.Renderer,
 	writer Writer,
-	prompt IssueIDProvider,
+	searcher IssueSearcher,
 	coords notes.Coordinates,
 	workingDir string,
 ) *Service {
@@ -58,7 +58,7 @@ func New(
 		builder:    builder,
 		renderer:   renderer,
 		writer:     writer,
-		prompt:     prompt,
+		searcher:   searcher,
 		coords:     coords,
 		workingDir: workingDir,
 	}
@@ -68,10 +68,10 @@ func New(
 type Input struct {
 	CommitHash string
 	OutputPath string
-	// ReleaseIssueIDs is nil when the caller did not pass --ids, in which case
-	// the use case asks for them via the IssueIDProvider port. A non-nil (even
-	// empty) slice is used as-is.
-	ReleaseIssueIDs []string
+	// JQL is the optional --jql query that selects the release issue list. When
+	// empty, no issues are pre-selected and the builder summarizes every issue
+	// found in the commit range instead.
+	JQL string
 }
 
 // Result reports what happened, so the caller can print a friendly summary.
@@ -80,9 +80,9 @@ type Result struct {
 	OutputPath  string
 }
 
-// Run executes the full flow: validate the commit, read the commits, gather the
-// release issue IDs (asking for them when none were supplied), build the model,
-// render the Markdown, and write it to disk.
+// Run executes the full flow: validate the commit, read the commits, resolve the
+// release issue IDs from the JQL query (when given), build the model, render the
+// Markdown, and write it to disk.
 func (s *Service) Run(ctx context.Context, in Input) (Result, error) {
 	valid, err := s.repo.Validate(ctx, in.CommitHash)
 	if err != nil {
@@ -101,9 +101,9 @@ func (s *Service) Run(ctx context.Context, in Input) (Result, error) {
 		return Result{}, err
 	}
 
-	releaseIssueIDs := in.ReleaseIssueIDs
-	if releaseIssueIDs == nil {
-		releaseIssueIDs, err = s.prompt.ForIssueIDs()
+	var releaseIssueIDs []string
+	if in.JQL != "" {
+		releaseIssueIDs, err = s.searcher.SearchByJQL(ctx, in.JQL)
 		if err != nil {
 			return Result{}, err
 		}

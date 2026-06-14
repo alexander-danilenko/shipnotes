@@ -56,7 +56,7 @@ shipnotes <commit_hash> \
   -o SHIPNOTES.md \           # output file (default: SHIPNOTES.md)
   --repo-dir /path/to/repo \      # git repo to read (default: auto-detected)
   --env-file /path/to/.env \      # .env file to load (default: nearest .env)
-  --ids "CX-101,CX-102"           # optional release issue list for the summary
+  --jql "key IN (CX-101, CX-102)" # optional JQL selecting the release issues for the summary
 ```
 
 It needs six environment variables (see `.env.example`). With `--env-file` you load a specific file (a read error is fatal); otherwise a `.env` file in the current directory — or any parent, found by walking up — is loaded automatically. Real environment variables always take precedence over the file.
@@ -78,19 +78,19 @@ shipnotes/
 │   ├── domain/                       # THE CORE — entities + ports, no I/O.
 │   │   ├── commit/   commit.go       #   Commit entity + revert/reapply/key rules.
 │   │   │             repository.go   #   Port: read commits (Validate, Log).
-│   │   ├── issue/    issue.go        #   Issue entity + issue-key parsing.
+│   │   ├── issue/    issue.go        #   Issue entity.
 │   │   │             provider.go     #   Port: load issues by key.
 │   │   ├── notes/    model.go        #   The shipnotes data model + Coordinates.
 │   │   │             builder.go      #   Domain service: commits + issues → model.
 │   │   │             renderer.go     #   Port: render the model to text.
 │   │   └── report/   reporter.go     #   Port: progress messages.
 │   ├── application/ app.go           # Use case: orchestrates the whole flow via
-│   │                                 #   ports (+ Writer and IssueIDProvider ports).
+│   │                                 #   ports (+ Writer and IssueSearcher ports).
 │   ├── infrastructure/               # ADAPTERS — implement the ports.
 │   │   ├── git/         repository.go #   Runs `git`; validates refs (commit.Repository).
 │   │   │               parser.go     #     Raw `git log` text → commit.Commit values.
 │   │   │               remote.go     #     Infers org/repo/GitHub-URL from the remote.
-│   │   ├── jira/       client.go     #   Jira REST API → issue.Issue (issue.Provider).
+│   │   ├── jira/       client.go     #   Jira REST API → issue.Issue (issue.Provider + IssueSearcher).
 │   │   │               types.go      #     Jira API response types (JSON only).
 │   │   │               errors.go     #     Friendly network / API error messages.
 │   │   ├── markdown/   renderer.go   #   text/template render (notes.Renderer).
@@ -100,9 +100,8 @@ shipnotes/
 │   │   ├── terminal/   terminal.go   #   Colored console output (report.Reporter).
 │   │   └── fileoutput/ writer.go     #   Writes the Markdown file (application.Writer).
 │   └── cli/         cli.go           # Interface layer + composition root.
-│                    args.go          #   Flag parsing, usage, --ids resolution.
+│                    args.go          #   Flag parsing, usage, --jql flag.
 │                    repo.go          #   Resolves the repository directory.
-│                    prompt.go        #   Asks for --ids interactively (IssueIDProvider).
 │                    errors.go        #   Prints config-validation problems.
 ├── testdata/                         # Test fixtures + golden output (see below).
 └── docs/solutions/                   # Documented solutions to past problems (bugs,

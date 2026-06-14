@@ -50,14 +50,6 @@ func Run(args []string, version string) int {
 		return 0
 	}
 
-	// Parse --ids up front so a bad value fails fast, before any git work.
-	releaseIssueIDs, err := resolveReleaseIssueIDs(options.ids)
-	if err != nil {
-		console.Failure("\n💥 Invalid --ids parameter: " + err.Error())
-
-		return 1
-	}
-
 	repoDir, err := resolveRepoDir(options.repoDir)
 	if err != nil {
 		console.Failure("💥 " + err.Error())
@@ -78,9 +70,9 @@ func Run(args []string, version string) int {
 	service := buildService(settings, repoDir, console)
 
 	return generate(ctx, console, service, application.Input{
-		CommitHash:      options.commitHash,
-		OutputPath:      options.output,
-		ReleaseIssueIDs: releaseIssueIDs,
+		CommitHash: options.commitHash,
+		OutputPath: options.output,
+		JQL:        options.jql,
 	})
 }
 
@@ -135,7 +127,7 @@ func buildService(settings config.Settings, repoDir string, console *terminal.Co
 		builder,
 		markdown.New(),
 		fileoutput.New(),
-		NewPrompt(console, os.Stdin),
+		jiraClient,
 		coords,
 		repoDir,
 	)

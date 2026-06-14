@@ -166,6 +166,78 @@ func TestLoadByKeysMalformedJSON(t *testing.T) {
 	}
 }
 
+func TestSearchByJQLEmptyQuery(t *testing.T) {
+	// A blank query must not reach Jira at all.
+	server := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+		t.Error("no HTTP request should be made for an empty JQL query")
+	}))
+	defer server.Close()
+
+	keys, err := newTestClient(server.URL).SearchByJQL(context.Background(), "   ")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(keys) != 0 {
+		t.Errorf("expected no keys, got %d", len(keys))
+	}
+}
+
+func TestSearchByJQLReturnsKeys(t *testing.T) {
+	// The user's JQL must be sent verbatim, and the matching issue keys returned
+	// (following pagination, like the key-lookup path).
+	var gotJQL string
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotJQL = r.URL.Query().Get("jql")
+
+		if r.URL.Query().Get("nextPageToken") == "" {
+			writeJSON(t, w, searchResponse{
+				Issues:        []apiIssue{{Key: "CX-1"}, {Key: "CX-2"}},
+				NextPageToken: "page-2",
+			})
+
+			return
+		}
+
+		writeJSON(t, w, searchResponse{Issues: []apiIssue{{Key: "CX-3"}}})
+	}))
+	defer server.Close()
+
+	keys, err := newTestClient(server.URL).SearchByJQL(context.Background(), "project = CX AND fixVersion = 1.0.0")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if gotJQL != "project = CX AND fixVersion = 1.0.0" {
+		t.Errorf("jql sent: got %q, want the query verbatim", gotJQL)
+	}
+
+	if strings.Join(keys, ",") != "CX-1,CX-2,CX-3" {
+		t.Errorf("keys: got %v, want [CX-1 CX-2 CX-3]", keys)
+	}
+}
+
+func TestSearchByJQLAPIErrorNamesQuery(t *testing.T) {
+	// A failed JQL search has no pre-known keys, so the error must surface the
+	// query instead, to point at the likely cause (e.g. invalid JQL).
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		http.Error(w, `{"errorMessages":["bad jql"]}`, http.StatusBadRequest)
+	}))
+	defer server.Close()
+
+	_, err := newTestClient(server.URL).SearchByJQL(context.Background(), "project = NOPE")
+
+	var apiErr *APIError
+	if !errors.As(err, &apiErr) {
+		t.Fatalf("expected *APIError, got %T (%v)", err, err)
+	}
+
+	if !strings.Contains(apiErr.Error(), "JQL query: project = NOPE") {
+		t.Errorf("error should name the JQL query, got:\n%s", apiErr.Error())
+	}
+}
+
 func TestBuildKeyInJQL(t *testing.T) {
 	got := buildKeyInJQL([]string{"CX-1", "AB-2"})
 

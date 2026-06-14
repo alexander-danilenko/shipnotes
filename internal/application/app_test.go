@@ -45,15 +45,17 @@ func (f *fakeWriter) Write(content, path string) (string, error) {
 	return path, nil
 }
 
-type fakePrompt struct {
+type fakeSearcher struct {
 	called bool
-	ids    []string
+	gotJQL string
+	keys   []string
 }
 
-func (f *fakePrompt) ForIssueIDs() ([]string, error) {
+func (f *fakeSearcher) SearchByJQL(_ context.Context, jql string) ([]string, error) {
 	f.called = true
+	f.gotJQL = jql
 
-	return f.ids, nil
+	return f.keys, nil
 }
 
 // noopReporter discards the builder's progress messages in tests.
@@ -65,15 +67,15 @@ func (noopReporter) Failure(string) {}
 func (noopReporter) Warn(string)    {}
 func (noopReporter) Dim(string)     {}
 
-func newService(repo commit.Repository, writer application.Writer, prompt application.IssueIDProvider) *application.Service {
+func newService(repo commit.Repository, writer application.Writer, searcher application.IssueSearcher) *application.Service {
 	builder := notes.NewBuilder(fakeProvider{}, noopReporter{})
 	coords := notes.Coordinates{GithubBaseURL: "https://github.com/acme/widgets", JiraBaseURL: "https://acme.atlassian.net"}
 
-	return application.New(repo, builder, fakeRenderer{out: "RENDERED"}, writer, prompt, coords, "/repo")
+	return application.New(repo, builder, fakeRenderer{out: "RENDERED"}, writer, searcher, coords, "/repo")
 }
 
 func TestRunRejectsInvalidCommit(t *testing.T) {
-	svc := newService(fakeRepo{valid: false}, &fakeWriter{}, &fakePrompt{})
+	svc := newService(fakeRepo{valid: false}, &fakeWriter{}, &fakeSearcher{})
 
 	_, err := svc.Run(context.Background(), application.Input{CommitHash: "deadbee"})
 	if err == nil || !strings.Contains(err.Error(), "invalid commit hash") {
@@ -81,22 +83,29 @@ func TestRunRejectsInvalidCommit(t *testing.T) {
 	}
 }
 
-func TestRunPromptsOnlyWhenIDsAreNil(t *testing.T) {
+func TestRunSearchesWhenJQLProvided(t *testing.T) {
 	repo := fakeRepo{valid: true, commits: []commit.Commit{
 		{CanonicalHash: "h1", Hash: "h1", Topic: "CX-1: thing", JiraIssueIDs: []string{"CX-1"}, Authors: []string{"Jane"}},
 	}}
 
-	// nil IDs -> the prompt port is called.
-	prompt := &fakePrompt{ids: []string{"CX-1"}}
+	// A non-empty JQL -> the searcher port resolves the release issue list.
+	searcher := &fakeSearcher{keys: []string{"CX-1"}}
 	writer := &fakeWriter{}
 
-	result, err := newService(repo, writer, prompt).Run(context.Background(), application.Input{CommitHash: "HEAD~1"})
+	result, err := newService(repo, writer, searcher).Run(context.Background(), application.Input{
+		CommitHash: "HEAD~1",
+		JQL:        "key IN (CX-1)",
+	})
 	if err != nil {
 		t.Fatalf("run: %v", err)
 	}
 
-	if !prompt.called {
-		t.Error("expected the prompt port to be called when IDs are nil")
+	if !searcher.called {
+		t.Error("expected the searcher port to be called when --jql is provided")
+	}
+
+	if searcher.gotJQL != "key IN (CX-1)" {
+		t.Errorf("jql: got %q, want %q", searcher.gotJQL, "key IN (CX-1)")
 	}
 
 	if result.CommitCount != 1 {
@@ -112,22 +121,21 @@ func TestRunPromptsOnlyWhenIDsAreNil(t *testing.T) {
 	}
 }
 
-func TestRunSkipsPromptWhenIDsProvided(t *testing.T) {
+func TestRunSkipsSearchWhenJQLEmpty(t *testing.T) {
 	repo := fakeRepo{valid: true, commits: []commit.Commit{
 		{CanonicalHash: "h1", Hash: "h1", Topic: "CX-1: thing", JiraIssueIDs: []string{"CX-1"}, Authors: []string{"Jane"}},
 	}}
-	prompt := &fakePrompt{}
+	searcher := &fakeSearcher{}
 
-	_, err := newService(repo, &fakeWriter{}, prompt).Run(context.Background(), application.Input{
-		CommitHash:      "HEAD~1",
-		ReleaseIssueIDs: []string{"CX-1"},
+	_, err := newService(repo, &fakeWriter{}, searcher).Run(context.Background(), application.Input{
+		CommitHash: "HEAD~1",
 	})
 	if err != nil {
 		t.Fatalf("run: %v", err)
 	}
 
-	if prompt.called {
-		t.Error("prompt must not be called when IDs were supplied")
+	if searcher.called {
+		t.Error("searcher must not be called when --jql was not provided")
 	}
 }
 
@@ -135,10 +143,9 @@ func TestRunUsesAbsoluteOutputPathAsIs(t *testing.T) {
 	repo := fakeRepo{valid: true}
 	writer := &fakeWriter{}
 
-	_, err := newService(repo, writer, &fakePrompt{}).Run(context.Background(), application.Input{
-		CommitHash:      "HEAD",
-		OutputPath:      "/tmp/out.md",
-		ReleaseIssueIDs: []string{},
+	_, err := newService(repo, writer, &fakeSearcher{}).Run(context.Background(), application.Input{
+		CommitHash: "HEAD",
+		OutputPath: "/tmp/out.md",
 	})
 	if err != nil {
 		t.Fatalf("run: %v", err)

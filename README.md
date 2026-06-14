@@ -96,28 +96,30 @@ shipnotes <commit_hash> [options]
 | `-o`, `--output FILE` | `SHIPNOTES.md` | Output file. A relative path is written inside the repository directory. |
 | `--repo-dir DIR` | auto-detected | Git repository to read, searched from the current directory upward. |
 | `--env-file FILE` | nearest `.env` | `.env` file to load. |
-| `--ids "A-1,A-2"` | *prompt* | Comma-separated Jira issue keys expected in this release (the "Release summary" section). |
+| `--jql "QUERY"` | *summarize all* | JQL query whose matching issues become the expected release list (the "Release summary" section). |
 | `-v`, `--version` | | Show the version and exit. |
 | `-h`, `--help` | | Show full help and exit. |
 
-### The `--ids` list
+### The `--jql` query
 
-The `--ids` flag drives the **Release summary** section:
+The `--jql` flag drives the **Release summary** section by selecting the issues expected in this release:
 
-- **Explicit list** (`--ids "CX-101,CX-102"`) — each expected issue is compared against the commits. Expected issues found in commits are grouped under their Jira status (sorted alphabetically); expected issues that never appeared are listed under **Missing**; committed issues not on the expected list appear under **Extra**.
-- **Omitted** — you are prompted for the list interactively.
-- **Omitted and prompt skipped** (press Enter, or run non-interactively) — the summary defaults to *every* Jira ticket referenced in the commit range, grouped by status. **Missing** and **Extra** are then always empty.
+- **Explicit query** (`--jql "key IN (CX-101, CX-102)"` or any JQL, e.g. `--jql "project = CX AND fixVersion = 1.0.0"`) — every issue the query matches is compared against the commits. Expected issues found in commits are grouped under their Jira status (sorted alphabetically); expected issues that never appeared are listed under **Missing**; committed issues not matched by the query appear under **Extra**.
+- **Omitted** (or a query matching nothing) — the summary defaults to *every* Jira ticket referenced in the commit range, grouped by status. **Missing** and **Extra** are then always empty.
 
 The tool never decides which statuses mean "done" — it just shows each issue's status text and lets you read release readiness from the groups.
 
 ### Examples
 
 ```bash
-# Last 20 commits; prompts for the release issue list:
+# Last 20 commits; summarizes every issue found in the range:
 shipnotes HEAD~20
 
-# Everything since a release tag, with an explicit expected list:
-shipnotes $(git rev-parse tags/v1.0.0) --ids="CX-101,CX-102" -o SHIPNOTES.md
+# Everything since a release tag, with an explicit expected list via JQL:
+shipnotes $(git rev-parse tags/v1.0.0) --jql="key IN (CX-101, CX-102)" -o SHIPNOTES.md
+
+# Select the expected issues by fix version instead of listing keys:
+shipnotes $(git rev-parse tags/v1.0.0) --jql="project = CX AND fixVersion = 1.0.0"
 
 # Everything since the most recent tag:
 shipnotes $(git rev-parse "$(git describe --tags --abbrev=0)")
