@@ -535,8 +535,8 @@ func sortCaseInsensitive(names []string) {
 	})
 }
 
-// nowISO formats the current local time as an ISO-8601 timestamp with
-// microseconds: "2006-01-02T15:04:05.000000".
+// nowISO formats the current local time as an ISO-8601 timestamp to the
+// minute: "2006-01-02T15:04". Sub-minute precision is noise in release notes.
 func nowISO() string {
-	return time.Now().Format("2006-01-02T15:04:05.000000")
+	return time.Now().Format("2006-01-02T15:04")
 }

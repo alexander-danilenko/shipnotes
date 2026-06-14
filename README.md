@@ -68,9 +68,8 @@ Here's what the generated file looks like:
 ```markdown
 # Release Notes
 
-Generated: 2024-01-15T10:30:00.000000
-
-Repository: https://github.com/acme/widgets
+- **Generated:** 2024-01-15T10:30
+- **Repository:** https://github.com/acme/widgets
 
 ## Release summary
 

@@ -1,10 +1,8 @@
 # Release Notes
 
-Generated: {{ .Header.Date }}
-
-{{ if .Header.Repository }}Repository: {{ .Header.Repository }}
-
-{{ end -}}
+- **Generated:** {{ .Header.Date }}
+{{ if .Header.Repository }}- **Repository:** {{ .Header.Repository }}
+{{ end }}
 {{ if .Summary -}}
 ## Release summary
 
