@@ -20,6 +20,9 @@ type options struct {
 	// ids is nil when --ids was not supplied (the user is then prompted),
 	// and a (possibly empty) string when it was.
 	ids *string
+	// showVersion is set by -v/--version; it makes the program print its
+	// version and exit, without requiring the commit_hash argument.
+	showVersion bool
 }
 
 // registerFlags declares every command-line flag on fs, binding it to the
@@ -31,6 +34,8 @@ func registerFlags(fs *flag.FlagSet, opts *options, ids *string) {
 	fs.StringVar(&opts.repoDir, "repo-dir", "", "Git repository directory (defaults to current directory)")
 	fs.StringVar(&opts.envFile, "env-file", "", "Path to the .env file to load (defaults to the nearest .env)")
 	fs.StringVar(ids, "ids", "", "Comma-separated list of Jira Issue IDs (e.g. 'ABC-123,ABC-124')")
+	fs.BoolVar(&opts.showVersion, "v", false, "Show the version and exit")
+	fs.BoolVar(&opts.showVersion, "version", false, "Show the version and exit")
 
 	// Silence flag's own output. By default it writes the error message AND the
 	// full usage to stderr on any parse error; we report the error (with a help
@@ -69,6 +74,7 @@ Options:
                       they populate the "Release summary" section. If omitted,
                       you are prompted for them interactively; skip the prompt to
                       summarize every issue found in the commit range instead.
+  -v, --version       Show the version and exit.
   -h, --help          Show this help and exit.
 
 Configuration:
@@ -153,6 +159,12 @@ func parseArgs(args []string) (options, error) {
 
 	if idsSet {
 		opts.ids = &ids
+	}
+
+	// --version is handled before the positional requirement so that
+	// `shipnotes --version` works on its own, without a commit hash.
+	if opts.showVersion {
+		return opts, nil
 	}
 
 	switch len(positionals) {

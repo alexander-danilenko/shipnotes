@@ -23,9 +23,11 @@ import (
 	"github.com/alexander-danilenko/shipnotes/internal/infrastructure/terminal"
 )
 
-// Run is the program's real entry point: it returns a process exit code.
-// Keeping it separate from main makes the program straightforward to test.
-func Run(args []string) int {
+// Run is the program's real entry point: it returns a process exit code. The
+// version string is stamped into the binary at build time (see main.version)
+// and reported by --version. Keeping Run separate from main makes the program
+// straightforward to test.
+func Run(args []string, version string) int {
 	console := terminal.New(os.Stdout)
 
 	options, err := parseArgs(args)
@@ -39,6 +41,13 @@ func Run(args []string) int {
 		console.Dim("Run 'shipnotes --help' for usage.")
 
 		return 1
+	}
+
+	// --version short-circuits before any git or Jira work: print and exit.
+	if options.showVersion {
+		console.Plain("shipnotes " + version)
+
+		return 0
 	}
 
 	// Parse --ids up front so a bad value fails fast, before any git work.

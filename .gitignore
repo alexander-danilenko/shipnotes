@@ -5,6 +5,12 @@
 docs/
 .remember/
 
+# GoReleaser build output (local `goreleaser build/release` runs).
+dist/
+
+# Built binary (produced by `go build -o shipnotes .`).
+/shipnotes
+
 # Editor / OS noise.
 .idea/
 .vscode/

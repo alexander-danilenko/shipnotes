@@ -1,0 +1,35 @@
+# Builds the cross-platform binaries and publishes a GitHub release whenever a
+# version tag (e.g. v1.2.0) is pushed. The heavy lifting is in .goreleaser.yaml.
+name: release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write # create the release and upload the binary assets
+
+jobs:
+  goreleaser:
+    name: Build and publish release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # GoReleaser needs full history and tags for the changelog
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod # stay in lockstep with the module's Go version
+
+      - name: Run GoReleaser
+        uses: goreleaser/goreleaser-action@v6
+        with:
+          version: "~> v2"
+          args: release --clean
+        env:
+          # Provided automatically by Actions; grants the release upload above.
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -120,6 +120,7 @@ Step by step:
 - **Build:** `go build -o shipnotes .` → one static binary, no install step.
 - **Run anywhere** Go-built binaries run, provided `git` is on `PATH` and the Jira host is reachable.
 - **Configuration at runtime:** 6 env vars (see `.env.example`). Loaded from the real environment and the nearest `.env` (walking up from the working dir, or an explicit `--env-file`). Three Jira vars are usually all the user must set; the three GitHub vars are inferred from the git remote when unset.
+- **Release & distribution:** pushing a `v*` tag triggers `.github/workflows/release.yml`, which runs **GoReleaser** (`.goreleaser.yaml`) to cross-compile the binary for linux/darwin/windows × amd64/arm64, package the archives plus a `checksums.txt`, and publish a GitHub release. The release tag is stamped into the binary via `-ldflags -X main.version=…` and reported by `shipnotes --version`. GoReleaser is dev/CI-only tooling — it never ships in the binary, so goal 2 (zero runtime dependencies) still holds.
 
 ## 8. Crosscutting concepts
 
@@ -139,6 +140,7 @@ Step by step:
 | **Golden-file tests for output** | Treats rendered Markdown as a contract; any change is a reviewed diff. |
 | **Infer repo coordinates from the git remote** | Minimizes required configuration to the three Jira variables. |
 | **Workflow-agnostic status grouping** | Works on any Jira setup without per-project config. |
+| **Release via GoReleaser + GitHub Actions (tag-triggered)** | Reproducible cross-platform binaries with checksums on every `v*` tag, with no hand-built release steps; the tooling is CI-only and keeps the binary dependency-free. |
 
 ## 10. Quality requirements
 

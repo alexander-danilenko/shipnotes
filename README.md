@@ -19,7 +19,9 @@ Generate a Markdown release-notes file from your git history, annotating each co
 
 ## Install
 
-Requires [Go](https://go.dev/dl/) 1.26 or newer.
+Download a prebuilt binary for your platform from the [latest release](https://github.com/alexander-danilenko/shipnotes/releases/latest) (Linux, macOS, and Windows; amd64 and arm64), extract it, and put `shipnotes` on your `PATH`. Each release also publishes a `checksums.txt` to verify the download. Check which version you have with `shipnotes --version`.
+
+Or, with [Go](https://go.dev/dl/) 1.26 or newer:
 
 ```bash
 # Install the latest release into $GOBIN (usually ~/go/bin):
@@ -95,6 +97,7 @@ shipnotes <commit_hash> [options]
 | `--repo-dir DIR` | auto-detected | Git repository to read, searched from the current directory upward. |
 | `--env-file FILE` | nearest `.env` | `.env` file to load. |
 | `--ids "A-1,A-2"` | *prompt* | Comma-separated Jira issue keys expected in this release (the "Release summary" section). |
+| `-v`, `--version` | | Show the version and exit. |
 | `-h`, `--help` | | Show full help and exit. |
 
 ### The `--ids` list

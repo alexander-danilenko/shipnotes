@@ -7,14 +7,15 @@ import (
 
 func TestParseArgs(t *testing.T) {
 	tests := []struct {
-		name       string
-		args       []string
-		wantHash   string
-		wantOutput string
-		wantRepo   string
-		idsSet     bool
-		idsValue   string
-		wantErr    bool
+		name        string
+		args        []string
+		wantHash    string
+		wantOutput  string
+		wantRepo    string
+		idsSet      bool
+		idsValue    string
+		wantVersion bool
+		wantErr     bool
 	}{
 		{name: "hash only", args: []string{"abc1234"}, wantHash: "abc1234", wantOutput: "SHIPNOTES.md"},
 		{name: "flags before hash", args: []string{"-o", "out.md", "abc1234"}, wantHash: "abc1234", wantOutput: "out.md"},
@@ -24,6 +25,8 @@ func TestParseArgs(t *testing.T) {
 		{name: "ids provided", args: []string{"HEAD", "--ids", "CX-1"}, wantHash: "HEAD", wantOutput: "SHIPNOTES.md", idsSet: true, idsValue: "CX-1"},
 		{name: "ids empty string", args: []string{"HEAD", "--ids", ""}, wantHash: "HEAD", wantOutput: "SHIPNOTES.md", idsSet: true, idsValue: ""},
 		{name: "terminator before hash", args: []string{"-o", "x.md", "--", "abc1234"}, wantHash: "abc1234", wantOutput: "x.md"},
+		{name: "version long flag, no hash needed", args: []string{"--version"}, wantOutput: "SHIPNOTES.md", wantVersion: true},
+		{name: "version short flag", args: []string{"-v"}, wantOutput: "SHIPNOTES.md", wantVersion: true},
 		{name: "missing hash", args: []string{"-o", "out.md"}, wantErr: true},
 		{name: "extra positional", args: []string{"a", "b"}, wantErr: true},
 	}
@@ -53,6 +56,10 @@ func TestParseArgs(t *testing.T) {
 
 			if opts.repoDir != tc.wantRepo {
 				t.Errorf("repoDir: got %q, want %q", opts.repoDir, tc.wantRepo)
+			}
+
+			if opts.showVersion != tc.wantVersion {
+				t.Errorf("showVersion: got %v, want %v", opts.showVersion, tc.wantVersion)
 			}
 
 			if tc.idsSet {

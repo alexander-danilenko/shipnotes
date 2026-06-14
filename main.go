@@ -22,6 +22,12 @@ import (
 	"github.com/alexander-danilenko/shipnotes/internal/cli"
 )
 
+// version is the release identifier reported by `shipnotes --version`. It is
+// "dev" for local builds and overwritten at release time by the linker
+// (`-ldflags "-X main.version=..."`), which is how GoReleaser stamps the git
+// tag into the published binaries.
+var version = "dev"
+
 func main() {
-	os.Exit(cli.Run(os.Args[1:]))
+	os.Exit(cli.Run(os.Args[1:], version))
 }
