@@ -1,12 +1,12 @@
 # shipnotes
 
-Generate a Markdown release-notes file from your git history, annotating each commit with the status of its linked Jira issue.
+> *Ship notes, not sh\*t notes* — one well-formed Markdown file beats a wall of raw `git log`.
 
-`shipnotes` reads the commits between a starting point and `HEAD`, pulls the referenced Jira issues, and writes a single Markdown report: a release summary grouped by Jira status, the participating authors, and a full commit table with links back to GitHub and Jira.
+`shipnotes` turns your git history into a Markdown release-notes file. It reads the commits in a range, looks up the Jira issue each commit references, and writes a single report. The report has three sections: a release summary grouped by Jira status, a list of participating authors, and a commit table linked to GitHub and Jira.
 
-- **Single, dependency-free binary** — at runtime it needs only the `git` command and network access to the Jira REST API.
-- **Zero workflow assumptions** — issues are grouped by whatever status names they happen to have, so it works with any Jira configuration.
-- **Sensible defaults** — the repository and GitHub URL are inferred from your git remote; in the common case you only configure three Jira variables.
+- **Single, dependency-free binary.** At runtime it needs only the `git` command and network access to the Jira REST API.
+- **No workflow assumptions.** Issues are grouped by whatever status names they have, so it works with any Jira configuration.
+- **Sensible defaults.** `shipnotes` infers the repository and GitHub URL from your git remote. In the common case, you set only three Jira variables.
 
 ## Contents
 
@@ -19,7 +19,7 @@ Generate a Markdown release-notes file from your git history, annotating each co
 
 ## Install
 
-Download a prebuilt binary for your platform from the [latest release](https://github.com/alexander-danilenko/shipnotes/releases/latest) (Linux, macOS, and Windows; amd64 and arm64), extract it, and put `shipnotes` on your `PATH`. Each release also publishes a `checksums.txt` to verify the download. Check which version you have with `shipnotes --version`.
+Download a prebuilt binary from the [latest release](https://github.com/alexander-danilenko/shipnotes/releases/latest). Binaries are available for Linux, macOS, and Windows (amd64 and arm64). Extract it and put `shipnotes` on your `PATH`. Each release also publishes a `checksums.txt` to verify the download. To check your version, run `shipnotes --version`.
 
 Or, with [Go](https://go.dev/dl/) 1.26 or newer:
 
@@ -59,27 +59,27 @@ go run . <commit_hash> [options]
    shipnotes HEAD~20
    ```
 
-   This writes `SHIPNOTES.md` in the repository root. The repository org, name, and GitHub URL are inferred from your `origin` remote.
+   This writes `SHIPNOTES.md` in the repository root. `shipnotes` infers the repository org, name, and GitHub URL from your `origin` remote.
 
 ## Configuration
 
-`shipnotes` reads six variables. Provide them as real environment variables or in a `.env` file (see [`.env.example`](.env.example)); real environment variables always take precedence over the file.
+`shipnotes` reads six variables. Set them as environment variables or in a `.env` file (see [`.env.example`](.env.example)). Environment variables always take precedence over the file.
 
-| Variable | Meaning | Required? |
-|----------|---------|-----------|
-| `SHIPNOTES_JIRA_BASE_URL` | Jira base URL, e.g. `https://acme.atlassian.net` | **Yes** |
-| `SHIPNOTES_JIRA_EMAIL` | Jira account email (Basic auth) | **Yes** |
-| `SHIPNOTES_JIRA_TOKEN` | Jira read-scoped API token | **Yes** |
-| `SHIPNOTES_REPO_ORG` | GitHub organization name | Inferred¹ |
-| `SHIPNOTES_REPO_NAME` | GitHub repository name | Inferred¹ |
-| `SHIPNOTES_GITHUB_URL` | Repo base URL, e.g. `https://github.com/acme/widgets` | Inferred¹ |
+| Required? | Variable | Meaning |
+|-----------|----------|---------|
+| **Yes** | `SHIPNOTES_JIRA_BASE_URL` | Jira base URL, e.g. `https://acme.atlassian.net` |
+| **Yes** | `SHIPNOTES_JIRA_EMAIL` | Jira account email (Basic auth) |
+| **Yes** | `SHIPNOTES_JIRA_TOKEN` | Jira read-scoped API token |
+| Inferred¹ | `SHIPNOTES_REPO_ORG` | GitHub organization name |
+| Inferred¹ | `SHIPNOTES_REPO_NAME` | GitHub repository name |
+| Inferred¹ | `SHIPNOTES_GITHUB_URL` | Repo base URL, e.g. `https://github.com/acme/widgets` |
 
-¹ When unset, these are inferred from the repository's git remote (`origin`, then `upstream`). A custom SSH host alias (e.g. `git@github-work:org/repo.git` defined in `~/.ssh/config`) is resolved to its real hostname via `ssh -G`. Setting any variable explicitly always overrides the inferred value.
+¹ When unset, `shipnotes` infers these from the git remote (`origin`, then `upstream`). It resolves a custom SSH host alias (such as `git@github-work:org/repo.git` from `~/.ssh/config`) to its real hostname with `ssh -G`. Any variable you set explicitly overrides the inferred value.
 
 ### Where the `.env` file is loaded from
 
-- **`--env-file=/path/to/.env`** — load exactly this file. If it cannot be read, the tool stops with an error.
-- **Auto-discovery (when `--env-file` is omitted)** — look for a `.env` in the current directory, then walk *up* through parent directories and use the first one found. A single `.env` in a parent folder works no matter which subdirectory you run from.
+- **`--env-file=/path/to/.env`** — Loads exactly this file. If the file can't be read, `shipnotes` stops with an error.
+- **Auto-discovery (when `--env-file` is omitted)** — `shipnotes` looks for a `.env` in the current directory, then walks *up* through parent directories and uses the first one it finds. A single `.env` in a parent folder works from any subdirectory.
 
 ## Usage
 
@@ -87,7 +87,7 @@ go run . <commit_hash> [options]
 shipnotes <commit_hash> [options]
 ```
 
-`<commit_hash>` is the starting point (**exclusive**); the notes cover the range `<commit_hash>..HEAD`. It accepts a full or short hash, `HEAD`, or `HEAD~N`. A tag or branch name is not accepted directly — resolve it to a hash first, e.g. `$(git rev-parse tags/v1.0.0)`.
+`<commit_hash>` is the starting point, and it's **exclusive**: the notes cover the range `<commit_hash>..HEAD`. It accepts a full or short hash, `HEAD`, or `HEAD~N`. It doesn't accept a tag or branch name directly. Resolve one to a hash first, for example `$(git rev-parse tags/v1.0.0)`.
 
 ### Options
 
@@ -104,20 +104,29 @@ shipnotes <commit_hash> [options]
 
 ### The `--jql` query
 
-The `--jql` flag drives the **Release summary** section by selecting the issues expected in this release:
+The `--jql` flag drives the **Release summary** section. It selects the issues expected in this release.
 
-- **Explicit query** (`--jql "key IN (CX-101, CX-102)"` or any JQL, e.g. `--jql "project = CX AND fixVersion = 1.0.0"`) — every issue the query matches is compared against the commits. Expected issues found in commits are grouped under their Jira status (sorted alphabetically); expected issues that never appeared are listed under **Missing**; committed issues not matched by the query appear under **Extra**.
-- **Omitted** (or a query matching nothing) — the summary defaults to *every* Jira ticket referenced in the commit range, grouped by status. **Missing** and **Extra** are then always empty.
+- **Explicit query** — for example `--jql "key IN (CX-101, CX-102)"` or `--jql "project = CX AND fixVersion = 1.0.0"`. `shipnotes` compares the matching issues against the commits:
+  - Expected issues found in commits are grouped under their Jira status, sorted alphabetically.
+  - Expected issues that never appeared are listed under **Missing**.
+  - Committed issues the query didn't match appear under **Extra**.
+- **Omitted** (or a query that matches nothing) — the summary defaults to *every* Jira ticket referenced in the commit range, grouped by status. **Missing** and **Extra** are then always empty.
 
-Grouping never decides which statuses mean "done" — it just shows each issue's status text and lets you read release readiness from the groups.
+Grouping never decides which statuses mean "done." It shows each issue's status text and lets you read release readiness from the groups.
 
 ### Checked statuses
 
-`--checked-statuses` is one of two opt-in opinions the tool takes. Its value is a **case-insensitive regular expression** matched against each issue's *full* status text; every issue whose status matches renders as a completed checkbox (`[x]`) in the summary instead of an empty one (`[ ]`). The match is anchored to the whole status, so `done` checks a status of `Done` but not `Almost Done`; use alternation for several statuses (the default is `done|ready to release|ready for release`). Pass an empty string (`--checked-statuses=""`) to check nothing and keep the output fully status-neutral. The grouping and the commit-history table are unaffected — only the checkbox state changes.
+`--checked-statuses` is one of two opt-in opinions the tool takes. Its value is a **case-insensitive regular expression** matched against each issue's *full* status text. Issues whose status matches render as a completed checkbox (`[x]`) in the summary instead of an empty one (`[ ]`).
+
+The match is anchored to the whole status, so `done` matches `Done` but not `Almost Done`. Use alternation for several statuses; the default is `done|ready to release|ready for release`. To check nothing and keep the output status-neutral, pass an empty string: `--checked-statuses=""`. The grouping and the commit-history table are unaffected — only the checkbox state changes.
 
 ### Excluded commits
 
-`--exclude-commits` is the other opt-in opinion, and it is empty (off) by default. Its value is a **case-insensitive regular expression** matched — **unanchored**, so it catches a prefix or substring — against each commit's subject line, so one pattern can drop commits by type (`^(chore|docs|test|ci|build)(\(|:)`) or by ticket. The subject carries the Jira key, so a key works too; because the match is unanchored, anchor it with word boundaries (`\bCX-42\b`) when you mean one exact ticket and not also `CX-420`. Matching commits leave the commit-history table and the Release summary entirely; they are **not** deleted but **relocated** to an "Excluded commits" callout, so the notes stay auditable — they appear even when the range has no Jira issues at all. Exclusion is the first gate: a matched commit is reported only as excluded, even if it is also a revert or reapply. Pass an empty string (the default) to keep every commit.
+`--exclude-commits` is the other opt-in opinion, and it is empty (off) by default. Its value is a **case-insensitive regular expression** matched against each commit's subject line. The match is **unanchored**, so it catches a prefix or substring.
+
+One pattern can drop commits by type, such as `^(chore|docs|test|ci|build)(\(|:)`. The subject also carries the Jira key, so you can exclude by ticket. Because the match is unanchored, use word boundaries for one exact ticket: `\bCX-42\b` matches `CX-42` but not `CX-420`.
+
+Matching commits leave the commit-history table and the Release summary. They aren't deleted — they move to an "Excluded commits" section, so the notes stay auditable. This section appears even when the range has no Jira issues at all. Exclusion is the first gate: a matched commit is reported only as excluded, even if it's also a revert or reapply. Pass an empty string (the default) to keep every commit.
 
 ### Examples
 
@@ -149,7 +158,7 @@ shipnotes HEAD~5 --repo-dir /path/to/repo --env-file /path/to/.env
 
 ## Output
 
-The generated Markdown has four parts: a status-grouped **Release summary** (plus Missing/Extra and any reverted/reapplied commits), a **Participants** list, and a full **Commit history** table. For example:
+The generated Markdown has three sections: a status-grouped **Release summary** (with Missing, Extra, and any reverted or reapplied commits), a **Participants** list, and a full **Commit history** table. For example:
 
 ```markdown
 # Release Notes
@@ -193,4 +202,4 @@ go vet ./...               # built-in static analysis
 golangci-lint run ./...    # strict linting (expects 0 issues)
 ```
 
-See [`CLAUDE.md`](CLAUDE.md) for the architecture, project rules, and a Go primer aimed at readers new to the language.
+For the architecture, project rules, and a Go primer aimed at readers new to the language, see [`CLAUDE.md`](CLAUDE.md).
