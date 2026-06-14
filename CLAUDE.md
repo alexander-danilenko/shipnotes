@@ -4,28 +4,22 @@ This file tells Claude Code (and any human) how to work in this project.
 
 ## What this is
 
-`shipnotes` generates a Markdown release notes file from git history,
-annotating each commit with the status of its linked Jira issue.
+`shipnotes` generates a Markdown release notes file from git history, annotating each commit with the status of its linked Jira issue.
 
-It is a single, dependency-free binary that runs anywhere Go is installed, with
-no virtual environment or package install step — the only things it needs at
-runtime are the `git` command and network access to the Jira REST API.
+It is a single, dependency-free binary that runs anywhere Go is installed, with no virtual environment or package install step — the only things it needs at runtime are the `git` command and network access to the Jira REST API.
 
-> **Workflow-agnostic by design.** The tool makes no assumptions about your Jira
-> workflow. It does not have a notion of which statuses mean "done" — issues are
-> grouped by whatever status names they happen to have (sorted alphabetically),
-> and each commit shows its issue's status text as-is. The same algorithm works
-> on any repo and any Jira setup, with zero configuration.
+> **Workflow-agnostic by design.** The tool makes no assumptions about your Jira workflow. It does not have a notion of which statuses mean "done" — issues are grouped by whatever status names they happen to have (sorted alphabetically), and each commit shows its issue's status text as-is. The same algorithm works on any repo and any Jira setup, with zero configuration.
+
+## Keep ARCHITECTURE.md in sync (mandatory)
+
+[`ARCHITECTURE.md`](./ARCHITECTURE.md) (arc42-light) is the contract for this codebase's structure. **When a change crosses an architectural boundary, update `ARCHITECTURE.md` in the same change** — it's part of the task, not a follow-up. Boundary-crossing means: adding/removing/renaming/moving a package; changing a **port** (interface in `internal/domain/*` or `internal/application/app.go`) or its adapter; changing the flow in `app.go`/`cli.go`; changing runtime/build/config (env vars, `.env`, remote inference); changing `go.mod` deps; changing the output contract (template or golden files); or recording a design decision.
+
+`ARCHITECTURE.md` §12 maps each change to the exact section to edit. Keep edits surgical. Cosmetic edits (local renames, typos, intra-package refactors) need none.
 
 ## Guiding principles (read before changing anything)
 
-1. **Optimize for the reader, not the writer.** This code is meant to be
-   understood by people who have *never written Go*. Prefer a few extra lines of
-   obvious code over one clever line. Every exported type and function has a
-   doc comment that says what it does in plain English.
-2. **Use the standard library as hard as possible.** This project has **zero
-   external dependencies** (see `go.mod` — there is no `require` block). Every
-   capability is built on a Go built-in:
+1. **Optimize for the reader, not the writer.** This code is meant to be understood by people who have *never written Go*. Prefer a few extra lines of obvious code over one clever line. Every exported type and function has a doc comment that says what it does in plain English.
+2. **Use the standard library as hard as possible.** This project has **zero external dependencies** (see `go.mod` — there is no `require` block). Every capability is built on a Go built-in:
 
    | Need | Go standard library |
    |------|---------------------|
@@ -36,23 +30,9 @@ runtime are the `git` command and network access to the Jira REST API.
    | colored output | a small ANSI helper (`internal/infrastructure/terminal`) |
    | CLI flags | `flag` |
 
-   Adding a dependency requires a real justification. The only thing the project
-   uses beyond the Go toolchain is `golangci-lint` (a dev-only linter).
-3. **The output is a stable contract.** The exact Markdown the tool produces is
-   locked by golden-file tests (below). If you change rendering, regenerate the
-   golden files and explain why in the commit — a rendering change should always
-   be a deliberate, reviewed diff, never an accident.
-4. **Always reach for idiomatic Go.** In every aspect of Go development and the
-   Go ecosystem — package and file layout, naming, error handling, interfaces,
-   concurrency, generics, table-driven tests, build tooling, and module
-   management — propose and write the approach an experienced Go author would
-   recognize as idiomatic. Follow [Effective Go](https://go.dev/doc/effective_go),
-   the [Go Code Review Comments](https://go.dev/wiki/CodeReviewComments), and the
-   conventions of the standard library; let `gofmt`/`gofumpt`, `go vet`, and
-   `golangci-lint` be the arbiters. When more than one idiomatic option exists,
-   recommend the one that best serves principle 1 (the non-Go reader) and explain
-   the trade-off rather than silently picking the cleverest form. Reject
-   non-idiomatic patterns even when they would technically work.
+   Adding a dependency requires a real justification. Beyond the Go toolchain the project uses only dev-only tooling that never ships in the binary: `golangci-lint` (Go linter) and `markdownlint-cli2` (Markdown linter, run via `npx`, needs Node).
+3. **The output is a stable contract.** The exact Markdown the tool produces is locked by golden-file tests (below). If you change rendering, regenerate the golden files and explain why in the commit — a rendering change should always be a deliberate, reviewed diff, never an accident.
+4. **Always reach for idiomatic Go.** In every aspect of Go development and the Go ecosystem — package and file layout, naming, error handling, interfaces, concurrency, generics, table-driven tests, build tooling, and module management — propose and write the approach an experienced Go author would recognize as idiomatic. Follow [Effective Go](https://go.dev/doc/effective_go), the [Go Code Review Comments](https://go.dev/wiki/CodeReviewComments), and the conventions of the standard library; let `gofmt`/`gofumpt`, `go vet`, and `golangci-lint` be the arbiters. When more than one idiomatic option exists, recommend the one that best serves principle 1 (the non-Go reader) and explain the trade-off rather than silently picking the cleverest form. Reject non-idiomatic patterns even when they would technically work.
 
 ## How to run, build, and test
 
@@ -67,8 +47,7 @@ golangci-lint run ./...            # Full strict lint (must report 0 issues)
 gofmt -l .                         # List unformatted files (should be empty)
 ```
 
-Before considering any task complete, **all of these must pass**: `go build`,
-`go vet`, `go test ./...`, and `golangci-lint run ./...` with zero issues.
+Before considering any task complete, **all of these must pass**: `go build`, `go vet`, `go test ./...`, and `golangci-lint run ./...` with zero issues.
 
 ### Using the tool
 
@@ -80,48 +59,28 @@ shipnotes <commit_hash> \
   --ids "CX-101,CX-102"           # optional release issue list for the summary
 ```
 
-It needs six environment variables (see `.env.example`). With `--env-file` you
-load a specific file (a read error is fatal); otherwise a `.env` file in the
-current directory — or any parent, found by walking up — is loaded
-automatically. Real environment variables always take precedence over the file.
+It needs six environment variables (see `.env.example`). With `--env-file` you load a specific file (a read error is fatal); otherwise a `.env` file in the current directory — or any parent, found by walking up — is loaded automatically. Real environment variables always take precedence over the file.
 
-Three of those six — `SHIPNOTES_REPO_ORG`, `SHIPNOTES_REPO_NAME`, and
-`SHIPNOTES_GITHUB_URL` — are **inferred from the repository's git remote** when left
-unset, so in the common case you only configure the three Jira variables.
-`internal/infrastructure/git/remote.go` reads `origin` (then `upstream`), parses
-the org and repo out of the remote URL, and builds `https://<host>/<org>/<repo>`. A custom
-SSH host alias (e.g. `git@github-work:org/repo.git` from `~/.ssh/config`) is
-resolved to its real hostname via `ssh -G`. An explicitly set environment
-variable always wins over the inferred value.
+Three of those six — `SHIPNOTES_REPO_ORG`, `SHIPNOTES_REPO_NAME`, and `SHIPNOTES_GITHUB_URL` — are **inferred from the repository's git remote** when left unset, so in the common case you only configure the three Jira variables. `internal/infrastructure/git/remote.go` reads `origin` (then `upstream`), parses the org and repo out of the remote URL, and builds `https://<host>/<org>/<repo>`. A custom SSH host alias (e.g. `git@github-work:org/repo.git` from `~/.ssh/config`) is resolved to its real hostname via `ssh -G`. An explicitly set environment variable always wins over the inferred value.
 
 ## Architecture
 
-The code is a **DDD / hexagonal (ports-and-adapters)** design with four layers.
-Dependencies only ever point *inward*, toward the domain:
+The code is a **DDD / hexagonal (ports-and-adapters)** design with four layers. Dependencies only ever point *inward*, toward the domain:
 
-```
+```text
 cli → application → domain ← infrastructure
 ```
 
-- **domain** — the core: entities and the rules about them, plus the *ports*
-  (interfaces) the core needs. It imports nothing but the standard library and
-  other domain packages — no git, Jira, filesystem, or terminal. Grouped by
-  sub-domain: `commit`, `issue`, `notes` (release notes), and `report`.
-- **application** — the use-case orchestration. It runs the flow by talking to
-  ports; it does not know which concrete adapter is behind each one.
-- **infrastructure** — the *adapters* that implement the ports: the git, Jira,
-  Markdown, config, terminal, and file-output details live here.
-- **cli** — the interface layer: the command-line driving adapter and the
-  composition root (the one place that wires concrete adapters into the
-  application service).
+- **domain** — the core: entities and the rules about them, plus the *ports* (interfaces) the core needs. It imports nothing but the standard library and other domain packages — no git, Jira, filesystem, or terminal. Grouped by sub-domain: `commit`, `issue`, `notes` (release notes), and `report`.
+- **application** — the use-case orchestration. It runs the flow by talking to ports; it does not know which concrete adapter is behind each one.
+- **infrastructure** — the *adapters* that implement the ports: the git, Jira, Markdown, config, terminal, and file-output details live here.
+- **cli** — the interface layer: the command-line driving adapter and the composition root (the one place that wires concrete adapters into the application service).
 
-A **port** is just a Go interface owned by an inner layer; an **adapter** is a
-struct in `infrastructure`/`cli` that satisfies it. For example the domain
-declares `commit.Repository`, and `infrastructure/git` implements it.
+A **port** is just a Go interface owned by an inner layer; an **adapter** is a struct in `infrastructure`/`cli` that satisfies it. For example the domain declares `commit.Repository`, and `infrastructure/git` implements it.
 
 ## Directory map
 
-```
+```text
 shipnotes/
 ├── main.go                          # Thin entry point: calls cli.Run.
 ├── internal/
@@ -162,22 +121,16 @@ shipnotes/
                                       #   debugging in documented areas.
 ```
 
-The flow, end to end (`internal/application/app.go` is the place to start
-reading):
+The flow, end to end (`internal/application/app.go` is the place to start reading):
 
-```
+```text
 flags → validate commit → git log → parse commits → load Jira issues
       → build data model → render template → write Markdown file
 ```
 
 ## The golden-file strategy
 
-`testdata/cases/*.json` are sample inputs (each one is a serialized
-`notes.ReleaseNotes`). `testdata/golden/*.golden` are the **exact** Markdown
-the template produces for those inputs.
-`internal/infrastructure/markdown/renderer_test.go` renders each case and
-asserts the bytes match its golden file. This is how an unintended rendering
-change is caught.
+`testdata/cases/*.json` are sample inputs (each one is a serialized `notes.ReleaseNotes`). `testdata/golden/*.golden` are the **exact** Markdown the template produces for those inputs. `internal/infrastructure/markdown/renderer_test.go` renders each case and asserts the bytes match its golden file. This is how an unintended rendering change is caught.
 
 To regenerate the golden files after an intentional template or model change:
 
@@ -185,50 +138,42 @@ To regenerate the golden files after an intentional template or model change:
 go test ./internal/infrastructure/markdown -update
 ```
 
-Then review the resulting diff before committing it — the diff *is* the record
-of what your change did to the output.
+Then review the resulting diff before committing it — the diff *is* the record of what your change did to the output.
 
 ## Coding rules
 
 - **Formatting:** `gofmt`/`gofumpt` decide formatting. Never hand-format.
-- **Linting:** The linter is configured to be as strict as is practical
-  (`.golangci.yml` enables *every* linter, then disables a documented few).
-  Fix issues rather than adding `//nolint` — and when a `//nolint` is truly
-  warranted, it must include a `// reason`.
-- **Naming:** Files are lowercase, one clear responsibility each. Exported
-  names (capitalized) are part of a package's public surface; keep them small.
-- **Errors:** Return errors, don't panic (the one exception is `template.Must`
-  at startup, where a broken bundled template is a build-time bug). Handle
-  errors with the early-return guard pattern. User-facing error text is
-  intentionally descriptive prose.
-- **No globals with state.** Package-level `var`s are only used for compiled
-  regular expressions and the parsed template (immutable, shared, idiomatic).
-- **Comments explain *why*,** not *what* the next line literally does. Assume the
-  reader knows less Go than you; spell out non-obvious intent.
+- **Linting:** The linter is configured to be as strict as is practical (`.golangci.yml` enables *every* linter, then disables a documented few). Fix issues rather than adding `//nolint` — and when a `//nolint` is truly warranted, it must include a `// reason`.
+- **Naming:** Files are lowercase, one clear responsibility each. Exported names (capitalized) are part of a package's public surface; keep them small.
+- **Errors:** Return errors, don't panic (the one exception is `template.Must` at startup, where a broken bundled template is a build-time bug). Handle errors with the early-return guard pattern. User-facing error text is intentionally descriptive prose.
+- **No globals with state.** Package-level `var`s are only used for compiled regular expressions and the parsed template (immutable, shared, idiomatic).
+- **Comments explain *why*,** not *what* the next line literally does. Assume the reader knows less Go than you; spell out non-obvious intent.
+
+## Markdown & docs style
+
+- **One line per paragraph — do not hard-wrap prose.** Write each paragraph as a single line and let editors soft-wrap it for display. This keeps diffs clean (an edit changes one line, not a whole reflowed block).
+- A real line break inside a paragraph is only for genuine structure (list items, table rows, code blocks), never to fit a column width.
+- The one-line-per-paragraph rule is a convention the linter cannot enforce, so follow it by hand. It does **not** apply to the byte-locked output files (`internal/.../templates/*.tmpl`, `testdata/golden/*.golden`) — never reflow those.
+- **Lint and auto-format Markdown with `markdownlint-cli2`** (config: `.markdownlint-cli2.yaml`). After editing any `*.md`, run the fixer and leave it reporting zero errors:
+
+  ```bash
+  npx markdownlint-cli2 --fix   # auto-format, then report anything it can't fix
+  npx markdownlint-cli2         # check only, no changes
+  ```
+
+  The config disables the line-length rule (`MD013`, to allow long single-line paragraphs) and table-padding rule (`MD060`), and skips generated/locked files (`.remember/`, `testdata/`). ASCII diagrams use ` ```text ` fences.
 
 ## Go concepts for non-Go readers
 
-- **Package:** a folder of `.go` files sharing a name. Code in `internal/` is
-  private to this project.
-- **Exported vs unexported:** Capitalized names (`Build`, `Commit`) are public;
-  lowercase names (`parseCommit`) are private to their package.
-- **`error` return:** Functions return an `error` as their last value; `nil`
-  means success. Callers check `if err != nil { ... }`.
-- **Pointer for "optional":** `*SummaryData` can be `nil`, which the template
-  reads as "no summary section."
-- **Struct tags:** the `` `json:"..."` `` text on struct fields maps Go field
-  names to JSON keys. Ours intentionally match the Jira API (for the `jira`
-  types) and the on-disk golden-test fixtures (for the `notes` model), so do not
-  "tidy" them.
-- **`text/template` whitespace:** `{{- ` trims spaces/newlines before a tag and
-  ` -}}` trims after. That is how the template controls exact blank lines — the
-  golden tests will catch any mistake.
+- **Package:** a folder of `.go` files sharing a name. Code in `internal/` is private to this project.
+- **Exported vs unexported:** Capitalized names (`Build`, `Commit`) are public; lowercase names (`parseCommit`) are private to their package.
+- **`error` return:** Functions return an `error` as their last value; `nil` means success. Callers check `if err != nil { ... }`.
+- **Pointer for "optional":** `*SummaryData` can be `nil`, which the template reads as "no summary section."
+- **Struct tags:** the `` `json:"..."` `` text on struct fields maps Go field names to JSON keys. Ours intentionally match the Jira API (for the `jira` types) and the on-disk golden-test fixtures (for the `notes` model), so do not "tidy" them.
+- **`text/template` whitespace:** `{{-` trims spaces/newlines before a tag and `-}}` trims after. That is how the template controls exact blank lines — the golden tests will catch any mistake.
 
 ## Git conventions
 
-Follow the repository-wide git commit conventions in
-[`../CLAUDE.md`](../CLAUDE.md): commits use the Conventional Commits format,
-agents commit only when explicitly asked, and never push without being asked.
+Follow the repository-wide git commit conventions in [`../CLAUDE.md`](../CLAUDE.md): commits use the Conventional Commits format, agents commit only when explicitly asked, and never push without being asked.
 
-Project-specific note: scope the type with the package or area touched when it
-helps, e.g. `feat(gitlog): …`, `fix(config): …`, `feat(cli): …`.
+Project-specific note: scope the type with the package or area touched when it helps, e.g. `feat(gitlog): …`, `fix(config): …`, `feat(cli): …`.
