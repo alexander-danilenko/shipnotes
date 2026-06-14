@@ -4,6 +4,10 @@
 
 <h1 align="center">shipnotes</h1>
 
+<p align="center">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License: MIT"></a>
+</p>
+
 > *Ship notes, not sh\*t notes* — one well-formed Markdown file beats a wall of raw `git log`.
 
 `shipnotes` turns your git history into a Markdown release-notes file. It reads the commits in a range, looks up the Jira issue each commit references, and writes a single report. The report has three sections: a release summary grouped by Jira status, a list of participating authors, and a commit table linked to GitHub and Jira.

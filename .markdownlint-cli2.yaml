@@ -17,13 +17,14 @@ config:
   # Table cell padding is cosmetic and --fix cannot normalize delimiter rows, so
   # this rule only produces unfixable noise. GitHub renders tables fine regardless.
   MD060: false
-  # The README opens with a centered logo and title, which Markdown has no syntax
-  # for; it needs a little inline HTML. Allow just the tags that header uses.
+  # The README opens with a centered logo, title, and badge, which Markdown has no
+  # syntax for; it needs a little inline HTML. Allow just the tags that header uses.
   MD033:
     allowed_elements:
       - p
       - img
       - h1
+      - a
   # That same centered-logo block precedes the H1, so the file's first line is
   # HTML rather than a heading (the H1 still follows immediately after it).
   MD041: false
