@@ -48,7 +48,7 @@ go run . <commit_hash> [options]
 
 ## Quick start
 
-From inside your git repository, generate notes for the last 20 commits. Pass the three required Jira values as arguments:
+From inside your git repository, generate notes for the last 20 commits, passing the three required Jira values as flags:
 
 ```bash
 shipnotes HEAD~20 \
@@ -57,9 +57,9 @@ shipnotes HEAD~20 \
   --jira-token your-read-scoped-api-token
 ```
 
-This command writes `SHIPNOTES.md` to the repository root. `shipnotes` infers the GitHub repository from your `origin` remote.
+That writes `SHIPNOTES.md` to the repository root, inferring the GitHub repository from your `origin` remote. To avoid passing the Jira values on every run, set them as environment variables or in a `.env` file — see [Advanced usage](#advanced-usage).
 
-The generated Markdown has three sections: a status-grouped **Release summary** (with Missing, Extra, and any reverted or reapplied commits), a **Participants** list, and a full **Commit history** table. For example:
+Here's what the generated file looks like:
 
 ```markdown
 # Release Notes
@@ -94,8 +94,6 @@ Repository: https://github.com/acme/widgets
 | [`abc1234`](…/commit/abc1234) | [CX-101](…/browse/CX-101) | Done | CX-101: Add login page ([#42](…/pull/42)) | `Jane Doe` |
 | [`def5678`](…/commit/def5678) | N/A | No Issue | chore: tidy up | `Alex Smith`, `Jane Doe` |
 ```
-
-To avoid passing the Jira values on every run, set them as environment variables or in a `.env` file, and tune the output with the optional flags. See [Advanced usage](#advanced-usage).
 
 ## Usage
 
@@ -154,7 +152,7 @@ shipnotes HEAD~5 --repo-dir /path/to/repo --env-file /path/to/.env
 
 ### Configuration values
 
-`shipnotes` needs four values. Provide each one as a command-line flag or an environment variable (set directly or in a `.env` file — see [`.env.example`](.env.example)). A flag wins over the environment, and a real environment variable wins over the `.env` file.
+`shipnotes` needs four values. Provide each as a flag or an environment variable (set directly or in a `.env` file — see [`.env.example`](.env.example)). A flag wins over the environment, and a real environment variable wins over the `.env` file.
 
 | Required? | Flag | Environment variable | Meaning |
 |-----------|------|----------------------|---------|
@@ -190,7 +188,7 @@ The match is anchored to the whole status, so `done` matches `Done` but not `Alm
 
 ### Excluded commits
 
-`--exclude-commits` is the other opt-in opinion, and it is empty (off) by default. Its value is a **case-insensitive regular expression** matched against each commit's subject line. The match is **unanchored**, so it catches a prefix or substring.
+`--exclude-commits` is the other opt-in opinion, off by default. Its value is a **case-insensitive regular expression** matched against each commit's subject line. The match is **unanchored**, so it catches a prefix or substring.
 
 One pattern can drop commits by type, such as `^(chore|docs|test|ci|build)(\(|:)`. The subject also carries the Jira key, so you can exclude by ticket. Because the match is unanchored, use word boundaries for one exact ticket: `\bCX-42\b` matches `CX-42` but not `CX-420`.
 
