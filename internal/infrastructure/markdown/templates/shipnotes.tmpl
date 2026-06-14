@@ -52,19 +52,15 @@ Repository: {{ .Header.Repository }}
 - [ ] [`{{ .Hash }}`]({{ .URL }}) {{ .FormattedTopic }}
 {{ end }}
 {{ end -}}
-{{ end }}
----
-
+{{ end -}}
 {{ if .Authors -}}
-# Participants
+## Participants
 
 {{ range .Authors -}}
 - `{{ . }}`
+{{ end }}
 {{ end -}}
----
-
-{{ end -}}
-# Commit history
+## Commit history
 
 | Hash | Jira Key | Jira Status | Commit Message | Authors |
 |------|----------|-------------|----------------|---------|

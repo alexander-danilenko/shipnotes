@@ -4,15 +4,11 @@ Generated: 2024-02-20T08:00:00.000000
 
 Repository: https://github.com/acme/widgets
 
-
----
-
-# Participants
+## Participants
 
 - `Bob`
----
 
-# Commit history
+## Commit history
 
 | Hash | Jira Key | Jira Status | Commit Message | Authors |
 |------|----------|-------------|----------------|---------|

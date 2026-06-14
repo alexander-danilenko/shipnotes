@@ -13,15 +13,11 @@ Repository: https://github.com/acme/widgets
 
 
 
-
----
-
-# Participants
+## Participants
 
 - `Carol`
----
 
-# Commit history
+## Commit history
 
 | Hash | Jira Key | Jira Status | Commit Message | Authors |
 |------|----------|-------------|----------------|---------|

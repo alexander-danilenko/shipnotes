@@ -18,15 +18,11 @@ Repository: https://github.com/acme/widgets
 - [ ] [`aaa1111`](https://github.com/acme/widgets/commit/aaa1111222333aaa1111222333aaa1111222333a) chore: bump dependencies
 - [ ] [`bbb2222`](https://github.com/acme/widgets/commit/bbb2222333444bbb2222333444bbb2222333444b) docs: rewrite the README
 
-
----
-
-# Participants
+## Participants
 
 - `Jane Doe`
----
 
-# Commit history
+## Commit history
 
 | Hash | Jira Key | Jira Status | Commit Message | Authors |
 |------|----------|-------------|----------------|---------|

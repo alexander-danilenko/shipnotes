@@ -172,16 +172,12 @@ Repository: https://github.com/acme/widgets
 
 - [ ] [CX-300](https://acme.atlassian.net/browse/CX-300) Document API
 
----
-
-# Participants
+## Participants
 
 - `Alex Smith`
 - `Jane Doe`
 
----
-
-# Commit history
+## Commit history
 
 | Hash | Jira Key | Jira Status | Commit Message | Authors |
 |------|----------|-------------|----------------|---------|
