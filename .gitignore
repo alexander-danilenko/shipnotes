@@ -1,0 +1,10 @@
+# Local environment file (never commit secrets).
+.env
+
+# AI Workflow internal docs.
+docs/
+
+# Editor / OS noise.
+.idea/
+.vscode/
+.DS_Store

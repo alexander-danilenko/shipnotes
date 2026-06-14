@@ -1,0 +1,75 @@
+{
+  "header": {
+    "date": "2024-01-15T10:30:00.000000",
+    "repository": "https://github.com/acme/widgets"
+  },
+  "summary": {
+    "byStatus": [
+      {
+        "status": "Done",
+        "issues": [
+          { "key": "CX-101", "url": "https://acme.atlassian.net/browse/CX-101", "title": "Add login page" },
+          { "key": "CX-105", "url": "https://acme.atlassian.net/browse/CX-105", "title": "Fix logout" }
+        ]
+      },
+      {
+        "status": "In Progress",
+        "issues": [
+          { "key": "CX-200", "url": "https://acme.atlassian.net/browse/CX-200", "title": "Refactor auth" }
+        ]
+      },
+      {
+        "status": "Ready for Release",
+        "issues": [
+          { "key": "CX-110", "url": "https://acme.atlassian.net/browse/CX-110", "title": "Polish header" }
+        ]
+      }
+    ],
+    "missing": [
+      { "key": "CX-300", "url": "https://acme.atlassian.net/browse/CX-300", "title": "Document API" }
+    ],
+    "extra": [
+      {
+        "status": "Done",
+        "issues": [
+          { "key": "OPS-9", "url": "https://acme.atlassian.net/browse/OPS-9", "title": "Bump deps" }
+        ]
+      }
+    ],
+    "reverted": [
+      {
+        "hash": "abc1234",
+        "url": "https://github.com/acme/widgets/commit/abc1234567890abc1234567890abc1234567890a",
+        "formattedTopic": "Revert \"risky change\""
+      }
+    ],
+    "reapplied": [
+      {
+        "hash": "fed4321",
+        "url": "https://github.com/acme/widgets/commit/fed4321098765fed4321098765fed4321098765f",
+        "formattedTopic": "Reapply \"risky change\""
+      }
+    ]
+  },
+  "commits": [
+    {
+      "hash": "abc1234",
+      "url": "https://github.com/acme/widgets/commit/abc1234567890abc1234567890abc1234567890a",
+      "jiraIssueKey": "CX-101",
+      "jiraIssueUrl": "https://acme.atlassian.net/browse/CX-101",
+      "status": "Done",
+      "formattedTopic": "[CX-101](https://acme.atlassian.net/browse/CX-101): Add login page ([#42](https://github.com/acme/widgets/pull/42))",
+      "authors": "`Jane Doe`"
+    },
+    {
+      "hash": "def5678",
+      "url": "https://github.com/acme/widgets/commit/def5678901234def5678901234def5678901234d",
+      "jiraIssueKey": null,
+      "jiraIssueUrl": null,
+      "status": "No Issue",
+      "formattedTopic": "chore: tidy up",
+      "authors": "`Alex Smith`, `Jane Doe`"
+    }
+  ],
+  "authors": ["Alex Smith", "Jane Doe"]
+}

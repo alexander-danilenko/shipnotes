@@ -1,0 +1,31 @@
+{
+  "header": {
+    "date": "2024-04-10T16:45:00.000000",
+    "repository": "https://github.com/acme/widgets"
+  },
+  "summary": {
+    "byStatus": [
+      {
+        "status": "QA",
+        "issues": [
+          { "key": "CX-7", "url": "https://acme.atlassian.net/browse/CX-7", "title": "Edge case" }
+        ]
+      }
+    ],
+    "missing": [],
+    "extra": [],
+    "reverted": []
+  },
+  "commits": [
+    {
+      "hash": "3333333",
+      "url": "https://github.com/acme/widgets/commit/3333333333333333333333333333333333333333",
+      "jiraIssueKey": "CX-7",
+      "jiraIssueUrl": "https://acme.atlassian.net/browse/CX-7",
+      "status": "QA",
+      "formattedTopic": "[CX-7](https://acme.atlassian.net/browse/CX-7): edge case",
+      "authors": "`Carol`"
+    }
+  ],
+  "authors": ["Carol"]
+}

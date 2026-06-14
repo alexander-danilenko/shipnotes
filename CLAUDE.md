@@ -1,0 +1,234 @@
+# shipnotes — Project Rules & Guide
+
+This file tells Claude Code (and any human) how to work in this project.
+
+## What this is
+
+`shipnotes` generates a Markdown release notes file from git history,
+annotating each commit with the status of its linked Jira issue.
+
+It is a single, dependency-free binary that runs anywhere Go is installed, with
+no virtual environment or package install step — the only things it needs at
+runtime are the `git` command and network access to the Jira REST API.
+
+> **Workflow-agnostic by design.** The tool makes no assumptions about your Jira
+> workflow. It does not have a notion of which statuses mean "done" — issues are
+> grouped by whatever status names they happen to have (sorted alphabetically),
+> and each commit shows its issue's status text as-is. The same algorithm works
+> on any repo and any Jira setup, with zero configuration.
+
+## Guiding principles (read before changing anything)
+
+1. **Optimize for the reader, not the writer.** This code is meant to be
+   understood by people who have *never written Go*. Prefer a few extra lines of
+   obvious code over one clever line. Every exported type and function has a
+   doc comment that says what it does in plain English.
+2. **Use the standard library as hard as possible.** This project has **zero
+   external dependencies** (see `go.mod` — there is no `require` block). Every
+   capability is built on a Go built-in:
+
+   | Need | Go standard library |
+   |------|---------------------|
+   | templating | `text/template` |
+   | HTTP requests | `net/http` |
+   | URL / email validation | `net/url`, `net/mail` |
+   | `.env` parsing | a tiny hand-written parser (`internal/infrastructure/config/dotenv.go`) |
+   | colored output | a small ANSI helper (`internal/infrastructure/terminal`) |
+   | CLI flags | `flag` |
+
+   Adding a dependency requires a real justification. The only thing the project
+   uses beyond the Go toolchain is `golangci-lint` (a dev-only linter).
+3. **The output is a stable contract.** The exact Markdown the tool produces is
+   locked by golden-file tests (below). If you change rendering, regenerate the
+   golden files and explain why in the commit — a rendering change should always
+   be a deliberate, reviewed diff, never an accident.
+4. **Always reach for idiomatic Go.** In every aspect of Go development and the
+   Go ecosystem — package and file layout, naming, error handling, interfaces,
+   concurrency, generics, table-driven tests, build tooling, and module
+   management — propose and write the approach an experienced Go author would
+   recognize as idiomatic. Follow [Effective Go](https://go.dev/doc/effective_go),
+   the [Go Code Review Comments](https://go.dev/wiki/CodeReviewComments), and the
+   conventions of the standard library; let `gofmt`/`gofumpt`, `go vet`, and
+   `golangci-lint` be the arbiters. When more than one idiomatic option exists,
+   recommend the one that best serves principle 1 (the non-Go reader) and explain
+   the trade-off rather than silently picking the cleverest form. Reject
+   non-idiomatic patterns even when they would technically work.
+
+## How to run, build, and test
+
+All commands run from this directory (`shipnotes/`).
+
+```bash
+go run . <commit_hash> [options]   # Run without building a binary
+go build -o shipnotes .        # Build a standalone binary
+go test ./...                      # Run all tests
+go vet ./...                       # Built-in static checks
+golangci-lint run ./...            # Full strict lint (must report 0 issues)
+gofmt -l .                         # List unformatted files (should be empty)
+```
+
+Before considering any task complete, **all of these must pass**: `go build`,
+`go vet`, `go test ./...`, and `golangci-lint run ./...` with zero issues.
+
+### Using the tool
+
+```bash
+shipnotes <commit_hash> \
+  -o SHIPNOTES.md \           # output file (default: SHIPNOTES.md)
+  --repo-dir /path/to/repo \      # git repo to read (default: auto-detected)
+  --env-file /path/to/.env \      # .env file to load (default: nearest .env)
+  --ids "CX-101,CX-102"           # optional release issue list for the summary
+```
+
+It needs six environment variables (see `.env.example`). With `--env-file` you
+load a specific file (a read error is fatal); otherwise a `.env` file in the
+current directory — or any parent, found by walking up — is loaded
+automatically. Real environment variables always take precedence over the file.
+
+Three of those six — `SHIPNOTES_REPO_ORG`, `SHIPNOTES_REPO_NAME`, and
+`SHIPNOTES_GITHUB_URL` — are **inferred from the repository's git remote** when left
+unset, so in the common case you only configure the three Jira variables.
+`internal/infrastructure/git/remote.go` reads `origin` (then `upstream`), parses
+the org and repo out of the remote URL, and builds `https://<host>/<org>/<repo>`. A custom
+SSH host alias (e.g. `git@github-work:org/repo.git` from `~/.ssh/config`) is
+resolved to its real hostname via `ssh -G`. An explicitly set environment
+variable always wins over the inferred value.
+
+## Architecture
+
+The code is a **DDD / hexagonal (ports-and-adapters)** design with four layers.
+Dependencies only ever point *inward*, toward the domain:
+
+```
+cli → application → domain ← infrastructure
+```
+
+- **domain** — the core: entities and the rules about them, plus the *ports*
+  (interfaces) the core needs. It imports nothing but the standard library and
+  other domain packages — no git, Jira, filesystem, or terminal. Grouped by
+  sub-domain: `commit`, `issue`, `notes` (release notes), and `report`.
+- **application** — the use-case orchestration. It runs the flow by talking to
+  ports; it does not know which concrete adapter is behind each one.
+- **infrastructure** — the *adapters* that implement the ports: the git, Jira,
+  Markdown, config, terminal, and file-output details live here.
+- **cli** — the interface layer: the command-line driving adapter and the
+  composition root (the one place that wires concrete adapters into the
+  application service).
+
+A **port** is just a Go interface owned by an inner layer; an **adapter** is a
+struct in `infrastructure`/`cli` that satisfies it. For example the domain
+declares `commit.Repository`, and `infrastructure/git` implements it.
+
+## Directory map
+
+```
+shipnotes/
+├── main.go                          # Thin entry point: calls cli.Run.
+├── internal/
+│   ├── domain/                       # THE CORE — entities + ports, no I/O.
+│   │   ├── commit/   commit.go       #   Commit entity + revert/reapply/key rules.
+│   │   │             repository.go   #   Port: read commits (Validate, Log).
+│   │   ├── issue/    issue.go        #   Issue entity + issue-key parsing.
+│   │   │             provider.go     #   Port: load issues by key.
+│   │   ├── notes/    model.go        #   The shipnotes data model + Coordinates.
+│   │   │             builder.go      #   Domain service: commits + issues → model.
+│   │   │             renderer.go     #   Port: render the model to text.
+│   │   └── report/   reporter.go     #   Port: progress messages.
+│   ├── application/ app.go           # Use case: orchestrates the whole flow via
+│   │                                 #   ports (+ Writer and IssueIDProvider ports).
+│   ├── infrastructure/               # ADAPTERS — implement the ports.
+│   │   ├── git/         repository.go #   Runs `git`; validates refs (commit.Repository).
+│   │   │               parser.go     #     Raw `git log` text → commit.Commit values.
+│   │   │               remote.go     #     Infers org/repo/GitHub-URL from the remote.
+│   │   ├── jira/       client.go     #   Jira REST API → issue.Issue (issue.Provider).
+│   │   │               types.go      #     Jira API response types (JSON only).
+│   │   │               errors.go     #     Friendly network / API error messages.
+│   │   ├── markdown/   renderer.go   #   text/template render (notes.Renderer).
+│   │   │               templates/shipnotes.tmpl  # The Markdown template.
+│   │   ├── config/     config.go     #   Loads + validates the 6 env vars (3 fall
+│   │   │               dotenv.go     #     back to git-remote defaults). .env reader.
+│   │   ├── terminal/   terminal.go   #   Colored console output (report.Reporter).
+│   │   └── fileoutput/ writer.go     #   Writes the Markdown file (application.Writer).
+│   └── cli/         cli.go           # Interface layer + composition root.
+│                    args.go          #   Flag parsing, usage, --ids resolution.
+│                    repo.go          #   Resolves the repository directory.
+│                    prompt.go        #   Asks for --ids interactively (IssueIDProvider).
+│                    errors.go        #   Prints config-validation problems.
+├── testdata/                         # Test fixtures + golden output (see below).
+└── docs/solutions/                   # Documented solutions to past problems (bugs,
+                                      #   best practices, design patterns), organized by
+                                      #   category with YAML frontmatter (module, tags,
+                                      #   problem_type). Relevant when implementing or
+                                      #   debugging in documented areas.
+```
+
+The flow, end to end (`internal/application/app.go` is the place to start
+reading):
+
+```
+flags → validate commit → git log → parse commits → load Jira issues
+      → build data model → render template → write Markdown file
+```
+
+## The golden-file strategy
+
+`testdata/cases/*.json` are sample inputs (each one is a serialized
+`notes.ReleaseNotes`). `testdata/golden/*.golden` are the **exact** Markdown
+the template produces for those inputs.
+`internal/infrastructure/markdown/renderer_test.go` renders each case and
+asserts the bytes match its golden file. This is how an unintended rendering
+change is caught.
+
+To regenerate the golden files after an intentional template or model change:
+
+```bash
+go test ./internal/infrastructure/markdown -update
+```
+
+Then review the resulting diff before committing it — the diff *is* the record
+of what your change did to the output.
+
+## Coding rules
+
+- **Formatting:** `gofmt`/`gofumpt` decide formatting. Never hand-format.
+- **Linting:** The linter is configured to be as strict as is practical
+  (`.golangci.yml` enables *every* linter, then disables a documented few).
+  Fix issues rather than adding `//nolint` — and when a `//nolint` is truly
+  warranted, it must include a `// reason`.
+- **Naming:** Files are lowercase, one clear responsibility each. Exported
+  names (capitalized) are part of a package's public surface; keep them small.
+- **Errors:** Return errors, don't panic (the one exception is `template.Must`
+  at startup, where a broken bundled template is a build-time bug). Handle
+  errors with the early-return guard pattern. User-facing error text is
+  intentionally descriptive prose.
+- **No globals with state.** Package-level `var`s are only used for compiled
+  regular expressions and the parsed template (immutable, shared, idiomatic).
+- **Comments explain *why*,** not *what* the next line literally does. Assume the
+  reader knows less Go than you; spell out non-obvious intent.
+
+## Go concepts for non-Go readers
+
+- **Package:** a folder of `.go` files sharing a name. Code in `internal/` is
+  private to this project.
+- **Exported vs unexported:** Capitalized names (`Build`, `Commit`) are public;
+  lowercase names (`parseCommit`) are private to their package.
+- **`error` return:** Functions return an `error` as their last value; `nil`
+  means success. Callers check `if err != nil { ... }`.
+- **Pointer for "optional":** `*SummaryData` can be `nil`, which the template
+  reads as "no summary section."
+- **Struct tags:** the `` `json:"..."` `` text on struct fields maps Go field
+  names to JSON keys. Ours intentionally match the Jira API (for the `jira`
+  types) and the on-disk golden-test fixtures (for the `notes` model), so do not
+  "tidy" them.
+- **`text/template` whitespace:** `{{- ` trims spaces/newlines before a tag and
+  ` -}}` trims after. That is how the template controls exact blank lines — the
+  golden tests will catch any mistake.
+
+## Git conventions
+
+Follow the repository-wide git commit conventions in
+[`../CLAUDE.md`](../CLAUDE.md): commits use the Conventional Commits format,
+agents commit only when explicitly asked, and never push without being asked.
+
+Project-specific note: scope the type with the package or area touched when it
+helps, e.g. `feat(gitlog): …`, `fix(config): …`, `feat(cli): …`.

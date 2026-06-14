@@ -1,0 +1,60 @@
+# golangci-lint configuration — as strict as is practical.
+#
+# Philosophy: enable EVERY linter, then switch off only the handful that fight
+# idiomatic, readable Go. Each disabled linter has a one-line reason so the
+# choice is reviewable. See https://golangci-lint.run/ for the full catalog.
+version: "2"
+
+run:
+  timeout: 5m
+
+linters:
+  # Start from "everything on", then remove the ones that hurt more than help.
+  default: all
+  disable:
+    - exhaustruct      # Demands every struct field at every literal; fights Go's useful zero values.
+    - gochecknoglobals # Package-level compiled regexps and templates are the idiomatic, safe pattern.
+    - varnamelen       # Short names (i, w, c, ok, err) are idiomatic Go and read fine in small scopes.
+    - nonamedreturns   # Named returns are used deliberately here to document what each value means.
+    - tagliatelle      # JSON tags must match the Jira API and the original template keys verbatim.
+    - paralleltest     # Tests use t.Setenv and a shared template; parallelism adds risk, not value, here.
+    - wsl              # Superseded by wsl_v5 (kept on); enabling both would double-report.
+    - depguard         # No import allow/deny policy to enforce in a zero-dependency project.
+    - gomodguard       # Deprecated in favor of gomodguard_v2 (kept on); avoids a duplicate/deprecation warning.
+    - noinlineerr      # Forbids `if err := f(); err != nil` — the canonical, most-readable Go idiom.
+    - err113           # CLI error messages are intentionally descriptive prose, not programmatically matched.
+    - wrapcheck        # This is a leaf application; stdlib errors are shown to the user, not inspected by callers.
+
+  settings:
+    cyclop:
+      max-complexity: 15
+    lll:
+      line-length: 120
+    revive:
+      rules:
+        - name: exported
+          disabled: false
+
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - std-error-handling
+    rules:
+      # Test files may be longer, repeat literals, and read fixture files by path;
+      # relax the linters that would only create noise there.
+      - path: _test\.go
+        linters:
+          - funlen
+          - dupl
+          - gocognit
+          - cyclop
+          - lll
+          - goconst
+          - gosec
+          - testpackage # White-box tests deliberately live in-package to exercise unexported helpers.
+
+formatters:
+  enable:
+    - gofumpt   # Stricter gofmt.
+    - goimports # Keeps imports grouped and sorted.

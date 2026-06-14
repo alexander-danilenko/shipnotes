@@ -1,0 +1,28 @@
+# Release Notes
+
+Generated: 2024-04-10T16:45:00.000000
+
+Repository: https://github.com/acme/widgets
+
+## Release summary
+
+### QA
+
+- [ ] [CX-7](https://acme.atlassian.net/browse/CX-7) Edge case
+
+
+
+
+
+---
+
+# Participants
+
+- `Carol`
+---
+
+# Commit history
+
+| Hash | Jira Key | Jira Status | Commit Message | Authors |
+|------|----------|-------------|----------------|---------|
+| [`3333333`](https://github.com/acme/widgets/commit/3333333333333333333333333333333333333333) | [CX-7](https://acme.atlassian.net/browse/CX-7) | QA | [CX-7](https://acme.atlassian.net/browse/CX-7): edge case | `Carol` |

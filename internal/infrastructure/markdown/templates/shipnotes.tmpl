@@ -1,0 +1,66 @@
+# Release Notes
+
+Generated: {{ .Header.Date }}
+
+Repository: {{ .Header.Repository }}
+
+{{ if .Summary -}}
+## Release summary
+
+{{ range .Summary.ByStatus }}{{ if .Issues -}}
+### {{ .Status }}
+
+{{ range .Issues -}}
+- [ ] [{{ .Key }}]({{ .URL }}) {{ .Title }}
+{{ end }}
+{{ end }}{{ end }}
+{{ if .Summary.Missing -}}
+## Missing
+
+{{ range .Summary.Missing -}}
+- [ ] [{{ .Key }}]({{ .URL }}) {{ .Title }}
+{{ end }}
+{{ end }}
+{{ if .Summary.Extra -}}
+## Extra (not in release list)
+
+{{ range .Summary.Extra }}{{ if .Issues -}}
+**{{ .Status }}**
+{{ range .Issues -}}
+- [ ] [{{ .Key }}]({{ .URL }}) {{ .Title }}
+{{ end }}
+{{ end }}{{ end -}}
+{{ end }}
+{{ if .Summary.Reverted -}}
+## Reverted commits
+
+{{ range .Summary.Reverted -}}
+- [ ] [`{{ .Hash }}`]({{ .URL }}) {{ .FormattedTopic }}
+{{ end }}
+{{ end -}}
+{{ if .Summary.Reapplied -}}
+## Reapplied commits
+
+{{ range .Summary.Reapplied -}}
+- [ ] [`{{ .Hash }}`]({{ .URL }}) {{ .FormattedTopic }}
+{{ end }}
+{{ end -}}
+{{ end }}
+---
+
+{{ if .Authors -}}
+# Participants
+
+{{ range .Authors -}}
+- `{{ . }}`
+{{ end -}}
+---
+
+{{ end -}}
+# Commit history
+
+| Hash | Jira Key | Jira Status | Commit Message | Authors |
+|------|----------|-------------|----------------|---------|
+{{ range .Commits -}}
+| [`{{ .Hash }}`]({{ .URL }}) | {{ if .JiraIssueKey }}[{{ .JiraIssueKey }}]({{ .JiraIssueURL }}){{ else }}N/A{{ end }} | {{ .Status }} | {{ .FormattedTopic }} | {{ .Authors }} |
+{{ end -}}

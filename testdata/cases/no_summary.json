@@ -1,0 +1,19 @@
+{
+  "header": {
+    "date": "2024-02-20T08:00:00.000000",
+    "repository": "https://github.com/acme/widgets"
+  },
+  "summary": null,
+  "commits": [
+    {
+      "hash": "1111111",
+      "url": "https://github.com/acme/widgets/commit/1111111111111111111111111111111111111111",
+      "jiraIssueKey": "AB-1",
+      "jiraIssueUrl": "https://acme.atlassian.net/browse/AB-1",
+      "status": "Unknown",
+      "formattedTopic": "[AB-1](https://acme.atlassian.net/browse/AB-1): work",
+      "authors": "`Bob`"
+    }
+  ],
+  "authors": ["Bob"]
+}
