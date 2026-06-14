@@ -16,9 +16,8 @@
 
 - [Install](#install)
 - [Quick start](#quick-start)
-- [Configuration](#configuration)
 - [Usage](#usage)
-- [Output](#output)
+- [Advanced usage](#advanced-usage)
 - [Development](#development)
 
 ## Install
@@ -49,120 +48,16 @@ go run . <commit_hash> [options]
 
 ## Quick start
 
-1. Create a Jira API token and set the three required variables (in your shell or in a `.env` file — see [Configuration](#configuration)):
-
-   ```bash
-   export SHIPNOTES_JIRA_BASE_URL=https://acme.atlassian.net
-   export SHIPNOTES_JIRA_EMAIL=you@acme.com
-   export SHIPNOTES_JIRA_TOKEN=your-read-scoped-api-token
-   ```
-
-2. From inside your git repository, generate notes for the last 20 commits:
-
-   ```bash
-   shipnotes HEAD~20
-   ```
-
-   This writes `SHIPNOTES.md` in the repository root. `shipnotes` infers the GitHub repository from your `origin` remote.
-
-## Configuration
-
-`shipnotes` needs four values. Provide each one as a command-line flag or an environment variable (set directly or in a `.env` file — see [`.env.example`](.env.example)). A flag wins over the environment, and a real environment variable wins over the `.env` file.
-
-| Required? | Flag | Environment variable | Meaning |
-|-----------|------|----------------------|---------|
-| **Yes** | `--jira-base-url` | `SHIPNOTES_JIRA_BASE_URL` | Jira base URL, e.g. `https://acme.atlassian.net` |
-| **Yes** | `--jira-email` | `SHIPNOTES_JIRA_EMAIL` | Jira account email (Basic auth) |
-| **Yes** | `--jira-token` | `SHIPNOTES_JIRA_TOKEN` | Jira read-scoped API token |
-| Inferred¹ | `--github-repo` | `SHIPNOTES_GITHUB_REPO` | GitHub repository: a URL, an SSH remote, or the `org/repo` shorthand |
-
-¹ When unset, `shipnotes` infers the GitHub repository from the git remote (`origin`, then `upstream`). It resolves a custom SSH host alias (such as `git@github-work:org/repo.git` from `~/.ssh/config`) to its real hostname with `ssh -G`. A flag or environment variable you set explicitly overrides the inferred value. The GitHub repository is optional: if none can be determined, `shipnotes` warns and still writes the notes, omitting the commit and pull-request links. It also warns when the repository is not on `github.com`, since the links use GitHub's URL format.
-
-### Where the `.env` file is loaded from
-
-- **`--env-file=/path/to/.env`** — Loads exactly this file. If the file can't be read, `shipnotes` stops with an error.
-- **Auto-discovery (when `--env-file` is omitted)** — `shipnotes` looks for a `.env` in the current directory, then walks *up* through parent directories and uses the first one it finds. A single `.env` in a parent folder works from any subdirectory.
-
-## Usage
-
-```text
-shipnotes <commit_hash> [options]
-```
-
-`<commit_hash>` is the starting point, and it's **exclusive**: the notes cover the range `<commit_hash>..HEAD`. It accepts a full or short hash, `HEAD`, or `HEAD~N`. It doesn't accept a tag or branch name directly. Resolve one to a hash first, for example `$(git rev-parse tags/v1.0.0)`.
-
-### Options
-
-| Flag | Default | Description |
-|------|---------|-------------|
-| `-o`, `--output FILE` | `SHIPNOTES.md` | Output file. A relative path is written inside the repository directory. |
-| `--repo-dir DIR` | auto-detected | Git repository to read, searched from the current directory upward. |
-| `--env-file FILE` | nearest `.env` | `.env` file to load. |
-| `--jql "QUERY"` | *summarize all* | JQL query whose matching issues become the expected release list (the "Release summary" section). |
-| `--checked-statuses REGEXP` | `done\|ready to release\|ready for release` | Case-insensitive regexp matched against each issue's full status; matching issues render as completed (`[x]`) in the summary. Pass `""` to disable. |
-| `--exclude-commits REGEXP` | *empty* | Case-insensitive (unanchored) regexp matched against each commit's subject; matching commits are dropped from the notes into an "Excluded commits" section. Empty keeps every commit. |
-| `--jira-base-url URL` | from env | Jira base URL. Overrides `SHIPNOTES_JIRA_BASE_URL`. |
-| `--jira-email EMAIL` | from env | Jira account email. Overrides `SHIPNOTES_JIRA_EMAIL`. |
-| `--jira-token TOKEN` | from env | Jira read-scoped API token. Overrides `SHIPNOTES_JIRA_TOKEN`. |
-| `--github-repo REPO` | inferred | GitHub repo as a URL, SSH remote, or `org/repo`. Overrides `SHIPNOTES_GITHUB_REPO`; inferred from the git remote when unset. |
-| `-v`, `--version` | | Show the version and exit. |
-| `-h`, `--help` | | Show full help and exit. |
-
-### The `--jql` query
-
-The `--jql` flag drives the **Release summary** section. It selects the issues expected in this release.
-
-- **Explicit query** — for example `--jql "key IN (CX-101, CX-102)"` or `--jql "project = CX AND fixVersion = 1.0.0"`. `shipnotes` compares the matching issues against the commits:
-  - Expected issues found in commits are grouped under their Jira status, sorted alphabetically.
-  - Expected issues that never appeared are listed under **Missing**.
-  - Committed issues the query didn't match appear under **Extra**.
-- **Omitted** (or a query that matches nothing) — the summary defaults to *every* Jira ticket referenced in the commit range, grouped by status. **Missing** and **Extra** are then always empty.
-
-Grouping never decides which statuses mean "done." It shows each issue's status text and lets you read release readiness from the groups.
-
-### Checked statuses
-
-`--checked-statuses` is one of two opt-in opinions the tool takes. Its value is a **case-insensitive regular expression** matched against each issue's *full* status text. Issues whose status matches render as a completed checkbox (`[x]`) in the summary instead of an empty one (`[ ]`).
-
-The match is anchored to the whole status, so `done` matches `Done` but not `Almost Done`. Use alternation for several statuses; the default is `done|ready to release|ready for release`. To check nothing and keep the output status-neutral, pass an empty string: `--checked-statuses=""`. The grouping and the commit-history table are unaffected — only the checkbox state changes.
-
-### Excluded commits
-
-`--exclude-commits` is the other opt-in opinion, and it is empty (off) by default. Its value is a **case-insensitive regular expression** matched against each commit's subject line. The match is **unanchored**, so it catches a prefix or substring.
-
-One pattern can drop commits by type, such as `^(chore|docs|test|ci|build)(\(|:)`. The subject also carries the Jira key, so you can exclude by ticket. Because the match is unanchored, use word boundaries for one exact ticket: `\bCX-42\b` matches `CX-42` but not `CX-420`.
-
-Matching commits leave the commit-history table and the Release summary. They aren't deleted — they move to an "Excluded commits" section, so the notes stay auditable. This section appears even when the range has no Jira issues at all. Exclusion is the first gate: a matched commit is reported only as excluded, even if it's also a revert or reapply. Pass an empty string (the default) to keep every commit.
-
-### Examples
+From inside your git repository, generate notes for the last 20 commits. Pass the three required Jira values as arguments:
 
 ```bash
-# Last 20 commits; summarizes every issue found in the range:
-shipnotes HEAD~20
-
-# Everything since a release tag, with an explicit expected list via JQL:
-shipnotes $(git rev-parse tags/v1.0.0) --jql="key IN (CX-101, CX-102)" -o SHIPNOTES.md
-
-# Select the expected issues by fix version instead of listing keys:
-shipnotes $(git rev-parse tags/v1.0.0) --jql="project = CX AND fixVersion = 1.0.0"
-
-# Pre-check issues that are closed or verified (custom "done" statuses):
-shipnotes HEAD~20 --checked-statuses="closed|verified"
-
-# Drop docs/chore/test commits from the notes (they move to "Excluded commits"):
-shipnotes HEAD~20 --exclude-commits='^(chore|docs|test|ci|build)(\(|:)'
-
-# Everything since the most recent tag:
-shipnotes $(git rev-parse "$(git describe --tags --abbrev=0)")
-
-# Since this branch diverged from main (notes for the current feature branch):
-shipnotes $(git merge-base origin/main HEAD)
-
-# With an explicit repository directory and .env file:
-shipnotes HEAD~5 --repo-dir /path/to/repo --env-file /path/to/.env
+shipnotes HEAD~20 \
+  --jira-base-url https://acme.atlassian.net \
+  --jira-email you@acme.com \
+  --jira-token your-read-scoped-api-token
 ```
 
-## Output
+This command writes `SHIPNOTES.md` to the repository root. `shipnotes` infers the GitHub repository from your `origin` remote.
 
 The generated Markdown has three sections: a status-grouped **Release summary** (with Missing, Extra, and any reverted or reapplied commits), a **Participants** list, and a full **Commit history** table. For example:
 
@@ -199,6 +94,107 @@ Repository: https://github.com/acme/widgets
 | [`abc1234`](…/commit/abc1234) | [CX-101](…/browse/CX-101) | Done | CX-101: Add login page ([#42](…/pull/42)) | `Jane Doe` |
 | [`def5678`](…/commit/def5678) | N/A | No Issue | chore: tidy up | `Alex Smith`, `Jane Doe` |
 ```
+
+To avoid passing the Jira values on every run, set them as environment variables or in a `.env` file, and tune the output with the optional flags. See [Advanced usage](#advanced-usage).
+
+## Usage
+
+```text
+shipnotes <commit_hash> [options]
+```
+
+`<commit_hash>` is the starting point, and it's **exclusive**: the notes cover the range `<commit_hash>..HEAD`. It accepts a full or short hash, `HEAD`, or `HEAD~N`. It doesn't accept a tag or branch name directly. Resolve one to a hash first, for example `$(git rev-parse tags/v1.0.0)`.
+
+### Options
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `-o`, `--output FILE` | `SHIPNOTES.md` | Output file. A relative path is written inside the repository directory. |
+| `--repo-dir DIR` | auto-detected | Git repository to read, searched from the current directory upward. |
+| `--env-file FILE` | nearest `.env` | `.env` file to load. |
+| `--jql "QUERY"` | *summarize all* | JQL query whose matching issues become the expected release list (the "Release summary" section). |
+| `--checked-statuses REGEXP` | `done\|ready to release\|ready for release` | Case-insensitive regexp matched against each issue's full status; matching issues render as completed (`[x]`) in the summary. Pass `""` to disable. |
+| `--exclude-commits REGEXP` | *empty* | Case-insensitive (unanchored) regexp matched against each commit's subject; matching commits are dropped from the notes into an "Excluded commits" section. Empty keeps every commit. |
+| `--jira-base-url URL` | from env | Jira base URL. Overrides `SHIPNOTES_JIRA_BASE_URL`. |
+| `--jira-email EMAIL` | from env | Jira account email. Overrides `SHIPNOTES_JIRA_EMAIL`. |
+| `--jira-token TOKEN` | from env | Jira read-scoped API token. Overrides `SHIPNOTES_JIRA_TOKEN`. |
+| `--github-repo REPO` | inferred | GitHub repo as a URL, SSH remote, or `org/repo`. Overrides `SHIPNOTES_GITHUB_REPO`; inferred from the git remote when unset. |
+| `-v`, `--version` | | Show the version and exit. |
+| `-h`, `--help` | | Show full help and exit. |
+
+### Examples
+
+```bash
+# Last 20 commits; summarizes every issue found in the range:
+shipnotes HEAD~20
+
+# Everything since a release tag, with an explicit expected list via JQL:
+shipnotes $(git rev-parse tags/v1.0.0) --jql="key IN (CX-101, CX-102)" -o SHIPNOTES.md
+
+# Select the expected issues by fix version instead of listing keys:
+shipnotes $(git rev-parse tags/v1.0.0) --jql="project = CX AND fixVersion = 1.0.0"
+
+# Pre-check issues that are closed or verified (custom "done" statuses):
+shipnotes HEAD~20 --checked-statuses="closed|verified"
+
+# Drop docs/chore/test commits from the notes (they move to "Excluded commits"):
+shipnotes HEAD~20 --exclude-commits='^(chore|docs|test|ci|build)(\(|:)'
+
+# Everything since the most recent tag:
+shipnotes $(git rev-parse "$(git describe --tags --abbrev=0)")
+
+# Since this branch diverged from main (notes for the current feature branch):
+shipnotes $(git merge-base origin/main HEAD)
+
+# With an explicit repository directory and .env file:
+shipnotes HEAD~5 --repo-dir /path/to/repo --env-file /path/to/.env
+```
+
+## Advanced usage
+
+### Configuration values
+
+`shipnotes` needs four values. Provide each one as a command-line flag or an environment variable (set directly or in a `.env` file — see [`.env.example`](.env.example)). A flag wins over the environment, and a real environment variable wins over the `.env` file.
+
+| Required? | Flag | Environment variable | Meaning |
+|-----------|------|----------------------|---------|
+| **Yes** | `--jira-base-url` | `SHIPNOTES_JIRA_BASE_URL` | Jira base URL, e.g. `https://acme.atlassian.net` |
+| **Yes** | `--jira-email` | `SHIPNOTES_JIRA_EMAIL` | Jira account email (Basic auth) |
+| **Yes** | `--jira-token` | `SHIPNOTES_JIRA_TOKEN` | Jira read-scoped API token |
+| Inferred¹ | `--github-repo` | `SHIPNOTES_GITHUB_REPO` | GitHub repository: a URL, an SSH remote, or the `org/repo` shorthand |
+
+¹ When unset, `shipnotes` infers the GitHub repository from the git remote (`origin`, then `upstream`). It resolves a custom SSH host alias (such as `git@github-work:org/repo.git` from `~/.ssh/config`) to its real hostname with `ssh -G`. A flag or environment variable you set explicitly overrides the inferred value. The GitHub repository is optional: if none can be determined, `shipnotes` warns and still writes the notes, omitting the commit and pull-request links. It also warns when the repository is not on `github.com`, since the links use GitHub's URL format.
+
+### Where the `.env` file is loaded from
+
+- **`--env-file=/path/to/.env`** — Loads exactly this file. If the file can't be read, `shipnotes` stops with an error.
+- **Auto-discovery (when `--env-file` is omitted)** — `shipnotes` looks for a `.env` in the current directory, then walks *up* through parent directories and uses the first one it finds. A single `.env` in a parent folder works from any subdirectory.
+
+### The `--jql` query
+
+The `--jql` flag drives the **Release summary** section. It selects the issues expected in this release.
+
+- **Explicit query** — for example `--jql "key IN (CX-101, CX-102)"` or `--jql "project = CX AND fixVersion = 1.0.0"`. `shipnotes` compares the matching issues against the commits:
+  - Expected issues found in commits are grouped under their Jira status, sorted alphabetically.
+  - Expected issues that never appeared are listed under **Missing**.
+  - Committed issues the query didn't match appear under **Extra**.
+- **Omitted** (or a query that matches nothing) — the summary defaults to *every* Jira ticket referenced in the commit range, grouped by status. **Missing** and **Extra** are then always empty.
+
+Grouping never decides which statuses mean "done." It shows each issue's status text and lets you read release readiness from the groups.
+
+### Checked statuses
+
+`--checked-statuses` is one of two opt-in opinions the tool takes. Its value is a **case-insensitive regular expression** matched against each issue's *full* status text. Issues whose status matches render as a completed checkbox (`[x]`) in the summary instead of an empty one (`[ ]`).
+
+The match is anchored to the whole status, so `done` matches `Done` but not `Almost Done`. Use alternation for several statuses; the default is `done|ready to release|ready for release`. To check nothing and keep the output status-neutral, pass an empty string: `--checked-statuses=""`. The grouping and the commit-history table are unaffected — only the checkbox state changes.
+
+### Excluded commits
+
+`--exclude-commits` is the other opt-in opinion, and it is empty (off) by default. Its value is a **case-insensitive regular expression** matched against each commit's subject line. The match is **unanchored**, so it catches a prefix or substring.
+
+One pattern can drop commits by type, such as `^(chore|docs|test|ci|build)(\(|:)`. The subject also carries the Jira key, so you can exclude by ticket. Because the match is unanchored, use word boundaries for one exact ticket: `\bCX-42\b` matches `CX-42` but not `CX-420`.
+
+Matching commits leave the commit-history table and the Release summary. They aren't deleted — they move to an "Excluded commits" section, so the notes stay auditable. This section appears even when the range has no Jira issues at all. Exclusion is the first gate: a matched commit is reported only as excluded, even if it's also a revert or reapply. Pass an empty string (the default) to keep every commit.
 
 ## Development
 
