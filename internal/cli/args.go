@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-
-	"github.com/alexander-danilenko/shipnotes/internal/domain/issue"
 )
 
 // options holds the parsed command-line arguments.
@@ -17,23 +15,22 @@ type options struct {
 	repoDir    string
 	// envFile is the explicit --env-file path, or "" to auto-discover a .env.
 	envFile string
-	// ids is nil when --ids was not supplied (the user is then prompted),
-	// and a (possibly empty) string when it was.
-	ids *string
+	// jql is the optional JQL query selecting the release issue list, or "" when
+	// --jql was not supplied (the builder then summarizes every issue in range).
+	jql string
 	// showVersion is set by -v/--version; it makes the program print its
 	// version and exit, without requiring the commit_hash argument.
 	showVersion bool
 }
 
 // registerFlags declares every command-line flag on fs, binding it to the
-// destination in opts (or the ids string, which needs separate "was it set?"
-// detection). It also installs the usage message.
-func registerFlags(fs *flag.FlagSet, opts *options, ids *string) {
+// destination in opts. It also installs the usage message.
+func registerFlags(fs *flag.FlagSet, opts *options) {
 	fs.StringVar(&opts.output, "o", "SHIPNOTES.md", "Output file path")
 	fs.StringVar(&opts.output, "output", "SHIPNOTES.md", "Output file path")
 	fs.StringVar(&opts.repoDir, "repo-dir", "", "Git repository directory (defaults to current directory)")
 	fs.StringVar(&opts.envFile, "env-file", "", "Path to the .env file to load (defaults to the nearest .env)")
-	fs.StringVar(ids, "ids", "", "Comma-separated list of Jira Issue IDs (e.g. 'ABC-123,ABC-124')")
+	fs.StringVar(&opts.jql, "jql", "", "JQL query selecting the release issues (e.g. 'key IN (PROJ-123, PROJ-456)')")
 	fs.BoolVar(&opts.showVersion, "v", false, "Show the version and exit")
 	fs.BoolVar(&opts.showVersion, "version", false, "Show the version and exit")
 
@@ -70,10 +67,10 @@ Options:
                       current directory upward).
   --env-file FILE     .env file to load. Defaults to the nearest .env, found by
                       searching the current directory and its parents.
-  --ids "A-1,A-2"     Comma-separated Jira issue keys expected in this release;
-                      they populate the "Release summary" section. If omitted,
-                      you are prompted for them interactively; skip the prompt to
-                      summarize every issue found in the commit range instead.
+  --jql "QUERY"       JQL query whose matching issues populate the "Release
+                      summary" section, e.g. 'key IN (PROJ-123, PROJ-456)'. If
+                      omitted, every issue found in the commit range is
+                      summarized instead.
   -v, --version       Show the version and exit.
   -h, --help          Show this help and exit.
 
@@ -92,11 +89,15 @@ Configuration:
     SHIPNOTES_GITHUB_URL     e.g. https://github.com/acme/widgets
 
 Examples:
-  # Last 20 commits; prompts for the release issue list:
+  # Last 20 commits; summarizes every issue found in the range:
   shipnotes HEAD~20
 
-  # Everything since a release tag (resolve the tag to a commit first):
-  shipnotes $(git rev-parse tags/v1.0.0) --ids="CX-101,CX-102" -o SHIPNOTES.md
+  # Everything since a release tag (resolve the tag to a commit first), with an
+  # explicit release issue list selected by JQL:
+  shipnotes $(git rev-parse tags/v1.0.0) --jql="key IN (CX-101, CX-102)" -o SHIPNOTES.md
+
+  # Select the release issues by fix version instead of listing keys:
+  shipnotes $(git rev-parse tags/v1.0.0) --jql="project = CX AND fixVersion = 1.0.0"
 
   # Everything since the most recent tag:
   shipnotes $(git rev-parse "$(git describe --tags --abbrev=0)")
@@ -113,13 +114,9 @@ Examples:
 func parseArgs(args []string) (options, error) {
 	fs := flag.NewFlagSet("shipnotes", flag.ContinueOnError)
 
-	var (
-		opts   options
-		ids    string
-		idsSet bool
-	)
+	var opts options
 
-	registerFlags(fs, &opts, &ids)
+	registerFlags(fs, &opts)
 
 	// Everything after a literal "--" is a positional argument, never a flag.
 	flagArgs, afterTerminator := splitAtTerminator(args)
@@ -150,17 +147,6 @@ func parseArgs(args []string) (options, error) {
 
 	positionals = append(positionals, afterTerminator...)
 
-	// Detect whether --ids was actually provided (vs left at its default).
-	fs.Visit(func(f *flag.Flag) {
-		if f.Name == "ids" {
-			idsSet = true
-		}
-	})
-
-	if idsSet {
-		opts.ids = &ids
-	}
-
 	// --version is handled before the positional requirement so that
 	// `shipnotes --version` works on its own, without a commit hash.
 	if opts.showVersion {
@@ -190,16 +176,4 @@ func splitAtTerminator(args []string) (before, after []string) {
 	}
 
 	return args, nil
-}
-
-// resolveReleaseIssueIDs converts the --ids flag into a slice. It returns nil to
-// signal "ask the user interactively" when the flag was absent OR given as an
-// empty string: an empty --ids is treated the same as no --ids at all. A
-// non-empty value (even just whitespace) is parsed.
-func resolveReleaseIssueIDs(ids *string) ([]string, error) {
-	if ids == nil || *ids == "" {
-		return nil, nil
-	}
-
-	return issue.ParseIDs(*ids)
 }

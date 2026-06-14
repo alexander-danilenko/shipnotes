@@ -94,6 +94,37 @@ func (c *Client) LoadByKeys(ctx context.Context, issueKeys []string) ([]issue.Is
 	return allIssues, nil
 }
 
+// SearchByJQL runs a caller-supplied JQL query and returns the keys of every
+// matching issue, following pagination until Jira stops handing back a token. It
+// implements the application's IssueSearcher port: the --jql flag uses it to turn
+// a query into the release issue list. An empty query returns no keys without
+// calling Jira.
+func (c *Client) SearchByJQL(ctx context.Context, jql string) ([]string, error) {
+	if strings.TrimSpace(jql) == "" {
+		return nil, nil
+	}
+
+	c.reporter.Status("Searching Jira issues by JQL...")
+
+	// No pre-known keys: the query itself decides which issues match, so the
+	// error context carries the JQL instead (see APIError).
+	rawIssues, err := c.fetchPages(ctx, jql, nil)
+	if err != nil {
+		c.reporter.Failure("✗ Failed to search Jira issues")
+
+		return nil, err
+	}
+
+	keys := make([]string, 0, len(rawIssues))
+	for _, raw := range rawIssues {
+		keys = append(keys, raw.Key)
+	}
+
+	c.reporter.Success(fmt.Sprintf("✓ Found %d Jira issue(s) matching the JQL query", len(keys)))
+
+	return keys, nil
+}
+
 // toDomain maps a Jira API issue onto the clean domain entity. A missing status
 // becomes an empty string, which the shipnotes builder shows as "Unknown".
 func toDomain(raw apiIssue) issue.Issue {
@@ -109,11 +140,17 @@ func toDomain(raw apiIssue) issue.Issue {
 	}
 }
 
-// fetchBatch retrieves one batch of issues, following nextPageToken pagination
-// until Jira stops handing back a token (or returns an empty page).
+// fetchBatch retrieves one batch of issues by key, building the JQL clause from
+// the keys and delegating to fetchPages.
 func (c *Client) fetchBatch(ctx context.Context, issueKeys []string) ([]apiIssue, error) {
-	jql := buildKeyInJQL(issueKeys)
+	return c.fetchPages(ctx, buildKeyInJQL(issueKeys), issueKeys)
+}
 
+// fetchPages runs one JQL query, following nextPageToken pagination until Jira
+// stops handing back a token (or returns an empty page). issueKeys is the
+// pre-known key list (key-lookup path) or nil (free JQL path); it is only used
+// to enrich an API error.
+func (c *Client) fetchPages(ctx context.Context, jql string, issueKeys []string) ([]apiIssue, error) {
 	var issues []apiIssue
 
 	pageToken := "" // Empty on the first request; Jira returns the next one.
@@ -164,6 +201,7 @@ func (c *Client) fetchPage(
 			StatusText:      statusText(resp),
 			RequestURL:      c.baseURL + searchPath,
 			IssueKeys:       issueKeys,
+			JQL:             jql,
 			ResponseDetails: string(body),
 		}
 	}
