@@ -65,18 +65,9 @@ Three of those six — `SHIPNOTES_REPO_ORG`, `SHIPNOTES_REPO_NAME`, and `SHIPNOT
 
 ## Architecture
 
-The code is a **DDD / hexagonal (ports-and-adapters)** design with four layers. Dependencies only ever point *inward*, toward the domain:
+The architecture is documented in [`ARCHITECTURE.md`](./ARCHITECTURE.md) (arc42-light) — the single source of truth for the DDD / hexagonal layering (`cli → application → domain ← infrastructure`), the ports and their adapters, the runtime flow, and the design decisions. Read it before changing structure, and keep it in sync (see [Keep ARCHITECTURE.md in sync](#keep-architecturemd-in-sync-mandatory) above).
 
-```text
-cli → application → domain ← infrastructure
-```
-
-- **domain** — the core: entities and the rules about them, plus the *ports* (interfaces) the core needs. It imports nothing but the standard library and other domain packages — no git, Jira, filesystem, or terminal. Grouped by sub-domain: `commit`, `issue`, `notes` (release notes), and `report`.
-- **application** — the use-case orchestration. It runs the flow by talking to ports; it does not know which concrete adapter is behind each one.
-- **infrastructure** — the *adapters* that implement the ports: the git, Jira, Markdown, config, terminal, and file-output details live here.
-- **cli** — the interface layer: the command-line driving adapter and the composition root (the one place that wires concrete adapters into the application service).
-
-A **port** is just a Go interface owned by an inner layer; an **adapter** is a struct in `infrastructure`/`cli` that satisfies it. For example the domain declares `commit.Repository`, and `infrastructure/git` implements it.
+When reading the code, start at `internal/application/app.go` — the use case that orchestrates the whole flow through the ports. The file map below is the quick index for *where things live*; ARCHITECTURE.md explains *what and why*.
 
 ## Directory map
 
@@ -119,13 +110,6 @@ shipnotes/
                                       #   category with YAML frontmatter (module, tags,
                                       #   problem_type). Relevant when implementing or
                                       #   debugging in documented areas.
-```
-
-The flow, end to end (`internal/application/app.go` is the place to start reading):
-
-```text
-flags → validate commit → git log → parse commits → load Jira issues
-      → build data model → render template → write Markdown file
 ```
 
 ## The golden-file strategy
