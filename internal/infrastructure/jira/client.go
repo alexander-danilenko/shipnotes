@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -120,6 +121,16 @@ func (c *Client) SearchByJQL(ctx context.Context, jql string) ([]string, error) 
 		keys = append(keys, raw.Key)
 	}
 
+	// A successful search that matches nothing is not an error, but it is rarely
+	// what the user intended: the run continues by summarizing every issue in the
+	// commit range (see notes.Builder), so warn rather than report a quiet success.
+	if len(keys) == 0 {
+		c.reporter.Warn("⚠️  JQL query matched no issues.")
+		c.reporter.Warn("   Falling back to summarizing all issues found in the commit range.")
+
+		return keys, nil
+	}
+
 	c.reporter.Success(fmt.Sprintf("✓ Found %d Jira issue(s) matching the JQL query", len(keys)))
 
 	return keys, nil
@@ -202,6 +213,7 @@ func (c *Client) fetchPage(
 			RequestURL:      c.baseURL + searchPath,
 			IssueKeys:       issueKeys,
 			JQL:             jql,
+			Messages:        parseAPIMessages(body),
 			ResponseDetails: string(body),
 		}
 	}
@@ -249,6 +261,32 @@ func escapeJQLString(s string) string {
 	s = strings.ReplaceAll(s, `"`, `\"`)
 
 	return s
+}
+
+// parseAPIMessages extracts Jira's own explanation from an error response body,
+// so the user sees "Error in the JQL Query: ..." rather than raw JSON. It reads
+// errorMessages, the per-field errors map, and warningMessages, in that order of
+// importance. The map values are sorted so the output is deterministic. It
+// returns nil when the body is not the expected JSON or carries no messages, in
+// which case the caller falls back to showing the raw body.
+func parseAPIMessages(body []byte) []string {
+	var parsed apiErrorResponse
+	if err := json.Unmarshal(body, &parsed); err != nil {
+		return nil
+	}
+
+	messages := append([]string(nil), parsed.ErrorMessages...)
+
+	fieldErrors := make([]string, 0, len(parsed.Errors))
+	for _, message := range parsed.Errors {
+		fieldErrors = append(fieldErrors, message)
+	}
+
+	sort.Strings(fieldErrors)
+	messages = append(messages, fieldErrors...)
+	messages = append(messages, parsed.WarningMessages...)
+
+	return messages
 }
 
 // statusText returns the HTTP reason phrase (e.g. "Not Found"), falling back to

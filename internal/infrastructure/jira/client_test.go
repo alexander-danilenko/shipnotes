@@ -220,9 +220,11 @@ func TestSearchByJQLReturnsKeys(t *testing.T) {
 
 func TestSearchByJQLAPIErrorNamesQuery(t *testing.T) {
 	// A failed JQL search has no pre-known keys, so the error must surface the
-	// query instead, to point at the likely cause (e.g. invalid JQL).
+	// query instead, to point at the likely cause (e.g. invalid JQL). A 400 must
+	// also relay Jira's own explanation and give JQL-specific guidance rather than
+	// the generic credential advice.
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		http.Error(w, `{"errorMessages":["bad jql"]}`, http.StatusBadRequest)
+		http.Error(w, `{"errorMessages":["Error in the JQL Query: unknown field 'nope'"]}`, http.StatusBadRequest)
 	}))
 	defer server.Close()
 
@@ -233,8 +235,91 @@ func TestSearchByJQLAPIErrorNamesQuery(t *testing.T) {
 		t.Fatalf("expected *APIError, got %T (%v)", err, err)
 	}
 
-	if !strings.Contains(apiErr.Error(), "JQL query: project = NOPE") {
-		t.Errorf("error should name the JQL query, got:\n%s", apiErr.Error())
+	message := apiErr.Error()
+
+	if !strings.Contains(message, "JQL query: project = NOPE") {
+		t.Errorf("error should name the JQL query, got:\n%s", message)
+	}
+
+	if !strings.Contains(message, "Error in the JQL Query: unknown field 'nope'") {
+		t.Errorf("error should relay Jira's own message, got:\n%s", message)
+	}
+
+	if !strings.Contains(message, "The JQL query has a syntax error") {
+		t.Errorf("a 400 should give JQL-specific guidance, got:\n%s", message)
+	}
+
+	if strings.Contains(message, "Invalid JIRA credentials") {
+		t.Errorf("a 400 should not give credential guidance, got:\n%s", message)
+	}
+}
+
+// recordingReporter captures the messages sent to each Reporter method, so a
+// test can assert which kind of message (warning, success, ...) was emitted.
+type recordingReporter struct {
+	warns     []string
+	successes []string
+}
+
+func (r *recordingReporter) Status(string)          {}
+func (r *recordingReporter) Success(message string) { r.successes = append(r.successes, message) }
+func (r *recordingReporter) Failure(string)         {}
+func (r *recordingReporter) Warn(message string)    { r.warns = append(r.warns, message) }
+func (r *recordingReporter) Dim(string)             {}
+
+func TestSearchByJQLNoMatchesWarns(t *testing.T) {
+	// A query that matches nothing is reported as a warning (not a success), since
+	// the run silently falls back to summarizing the whole commit range.
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		writeJSON(t, w, searchResponse{Issues: nil})
+	}))
+	defer server.Close()
+
+	reporter := &recordingReporter{}
+	client := New(server.URL, "ci@example.com", "token", reporter)
+
+	keys, err := client.SearchByJQL(context.Background(), "project = EMPTY")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(keys) != 0 {
+		t.Errorf("keys: got %v, want empty", keys)
+	}
+
+	if len(reporter.warns) == 0 {
+		t.Fatalf("expected a warning when the query matched nothing, got none")
+	}
+
+	if len(reporter.successes) != 0 {
+		t.Errorf("a no-match search should not report success, got: %v", reporter.successes)
+	}
+
+	if !strings.Contains(strings.Join(reporter.warns, "\n"), "matched no issues") {
+		t.Errorf("warning should explain no issues matched, got: %v", reporter.warns)
+	}
+}
+
+func TestAPIErrorGuidanceByStatus(t *testing.T) {
+	cases := []struct {
+		name   string
+		status int
+		want   string
+	}{
+		{"bad request", http.StatusBadRequest, "The JQL query has a syntax error"},
+		{"unauthorized", http.StatusUnauthorized, "Invalid JIRA credentials"},
+		{"forbidden", http.StatusForbidden, "lacks permission"},
+		{"not found", http.StatusNotFound, "Jira base URL is incorrect"},
+		{"rate limited", http.StatusTooManyRequests, "rate limited"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			err := &APIError{Status: tc.status, StatusText: http.StatusText(tc.status)}
+			if !strings.Contains(err.Error(), tc.want) {
+				t.Errorf("status %d guidance should contain %q, got:\n%s", tc.status, tc.want, err.Error())
+			}
+		})
 	}
 }
 

@@ -141,6 +141,8 @@ Step by step:
 | **Infer repo coordinates from the git remote** | Minimizes required configuration to the three Jira variables. |
 | **Workflow-agnostic status grouping** | Works on any Jira setup without per-project config. |
 | **`--jql` as the sole release-issue source (no `--ids`, no interactive prompt)** | One non-interactive, script-friendly input; JQL expresses both explicit key lists (`key IN (…)`) and richer selections (`fixVersion`, `project`). The Jira search reuses the existing `/search/jql` adapter. Omitting `--jql` falls back to summarizing every issue in the commit range. |
+| **Warn (don't fail) when `--jql` matches no issues** | A zero-result query is valid but rarely intended, so the Jira adapter emits a warning and the run continues with the commit-range fallback. The builder distinguishes "no selection" (nil list → fallback note) from "selection matched nothing" (non-nil empty list → adapter already warned), so the user sees one clear message, not two. |
+| **Status-specific Jira API error messages with Jira's own detail** | `infrastructure/jira` parses the error body (`errorMessages`) and tailors the "Possible causes / Troubleshooting" guidance per HTTP status (400 → JQL, 401 → credentials, 403 → permissions, 404 → endpoint, 429 → rate limit), so a malformed JQL points at the query instead of generic credential advice. |
 | **Release via GoReleaser + GitHub Actions (tag-triggered)** | Reproducible cross-platform binaries with checksums on every `v*` tag, with no hand-built release steps; the tooling is CI-only and keeps the binary dependency-free. |
 
 ## 10. Quality requirements

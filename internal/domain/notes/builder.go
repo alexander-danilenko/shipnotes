@@ -48,11 +48,17 @@ func (b *Builder) Build(
 	// by the non-revert commits in the range, so all tickets in the diff still
 	// appear in the summary. Reverts are excluded here; they keep their own
 	// "Reverted commits" section.
+	//
+	// A nil list means the caller made no selection at all (no --jql). A non-nil
+	// but empty list means a selection was made but matched nothing (a --jql query
+	// that found no issues); in that case SearchByJQL has already warned about the
+	// fallback, so we stay quiet here to avoid a second, misleading message.
+	noSelectionMade := releaseIssueIDs == nil
 	if len(releaseIssueIDs) == 0 {
 		releaseIssueIDs = uniqueSortedJiraKeys(normalCommits)
-		if len(releaseIssueIDs) > 0 {
-			b.reporter.Dim(fmt.Sprintf(
-				"No release issue IDs given; summarizing all %d issue(s) found in the commit range.",
+		if len(releaseIssueIDs) > 0 && noSelectionMade {
+			b.reporter.Warn(fmt.Sprintf(
+				"⚠️  No release issue IDs given; summarizing all %d issue(s) found in the commit range.",
 				len(releaseIssueIDs),
 			))
 		}

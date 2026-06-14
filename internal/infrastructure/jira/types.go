@@ -24,3 +24,14 @@ type apiFields struct {
 type apiStatus struct {
 	Name string `json:"name"`
 }
+
+// apiErrorResponse is the body Jira returns on a failed request. The search
+// endpoint reports an invalid JQL query here: the human-readable reasons arrive
+// in errorMessages (e.g. "Error in the JQL Query: ..."), with per-field problems
+// in errors and softer notes in warningMessages. We surface these so the user
+// sees Jira's own explanation instead of a raw JSON blob.
+type apiErrorResponse struct {
+	ErrorMessages   []string          `json:"errorMessages"`
+	WarningMessages []string          `json:"warningMessages"`
+	Errors          map[string]string `json:"errors"`
+}

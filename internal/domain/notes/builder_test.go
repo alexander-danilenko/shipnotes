@@ -2,6 +2,7 @@ package notes_test
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/alexander-danilenko/shipnotes/internal/domain/commit"
@@ -28,6 +29,52 @@ func (noopReporter) Success(string) {}
 func (noopReporter) Failure(string) {}
 func (noopReporter) Warn(string)    {}
 func (noopReporter) Dim(string)     {}
+
+// warnRecorder captures the warnings the builder emits, so a test can assert
+// whether the "summarizing all issues" fallback warning appeared.
+type warnRecorder struct {
+	noopReporter
+
+	warns []string
+}
+
+func (w *warnRecorder) Warn(message string) { w.warns = append(w.warns, message) }
+
+func TestBuildFallbackWarningOnlyWhenNoSelection(t *testing.T) {
+	commits := []commit.Commit{
+		{CanonicalHash: "h1", Hash: "h1", Topic: "CX-101: login", JiraIssueIDs: []string{"CX-101"}, Authors: []string{"Jane"}},
+	}
+	issues := []issue.Issue{issueWithStatus("CX-101", "Login", "Done")}
+
+	cases := []struct {
+		name     string
+		release  []string
+		wantWarn bool
+	}{
+		// No --jql at all: a nil list means no selection was made, so a warning
+		// explains the fallback to summarizing the whole range.
+		{"no selection (nil)", nil, true},
+		// --jql ran but matched nothing: a non-nil empty list. SearchByJQL already
+		// warned, so the builder must stay quiet to avoid a second message.
+		{"empty selection (non-nil)", []string{}, false},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			reporter := &warnRecorder{}
+			builder := notes.NewBuilder(fakeProvider{issues: issues}, reporter)
+
+			if _, err := builder.Build(context.Background(), testCoords(), commits, tc.release); err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			gotWarn := strings.Contains(strings.Join(reporter.warns, "\n"), "summarizing all")
+			if gotWarn != tc.wantWarn {
+				t.Errorf("fallback warning: got %v, want %v (warns: %v)", gotWarn, tc.wantWarn, reporter.warns)
+			}
+		})
+	}
+}
 
 func testCoords() notes.Coordinates {
 	return notes.Coordinates{
