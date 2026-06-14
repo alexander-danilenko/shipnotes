@@ -8,7 +8,7 @@
       {
         "status": "QA",
         "issues": [
-          { "key": "CX-7", "url": "https://acme.atlassian.net/browse/CX-7", "title": "Edge case" }
+          { "key": "PROJ-7", "url": "https://acme.atlassian.net/browse/PROJ-7", "title": "Edge case" }
         ]
       }
     ],
@@ -20,10 +20,10 @@
     {
       "hash": "3333333",
       "url": "https://github.com/acme/widgets/commit/3333333333333333333333333333333333333333",
-      "jiraIssueKey": "CX-7",
-      "jiraIssueUrl": "https://acme.atlassian.net/browse/CX-7",
+      "jiraIssueKey": "PROJ-7",
+      "jiraIssueUrl": "https://acme.atlassian.net/browse/PROJ-7",
       "status": "QA",
-      "formattedTopic": "[CX-7](https://acme.atlassian.net/browse/CX-7): edge case",
+      "formattedTopic": "[PROJ-7](https://acme.atlassian.net/browse/PROJ-7): edge case",
       "authors": "`Carol`"
     }
   ],

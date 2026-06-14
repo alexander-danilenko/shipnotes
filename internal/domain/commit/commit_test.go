@@ -15,7 +15,7 @@ func TestExtractIssueIDs(t *testing.T) {
 	}{
 		{name: "empty", text: "", want: []string{}},
 		{name: "none", text: "chore: tidy up, no ticket", want: []string{}},
-		{name: "single", text: "CX-123: Add login page", want: []string{"CX-123"}},
+		{name: "single", text: "PROJ-123: Add login page", want: []string{"PROJ-123"}},
 		{name: "deduplicated in first-seen order", text: "AB-1 and AB-1 again plus CD-2", want: []string{"AB-1", "CD-2"}},
 	}
 
@@ -29,8 +29,8 @@ func TestExtractIssueIDs(t *testing.T) {
 }
 
 func TestIsRevertTopic(t *testing.T) {
-	revert := []string{`Revert "CX-99: risky change"`, "revert: undo it", "  REVERT something"}
-	notRevert := []string{"CX-1: add feature", `Reapply "CX-99: risky change"`, ""}
+	revert := []string{`Revert "PROJ-99: risky change"`, "revert: undo it", "  REVERT something"}
+	notRevert := []string{"PROJ-1: add feature", `Reapply "PROJ-99: risky change"`, ""}
 
 	for _, topic := range revert {
 		if !commit.IsRevertTopic(topic) {
@@ -47,11 +47,11 @@ func TestIsRevertTopic(t *testing.T) {
 
 func TestIsReapplyTopic(t *testing.T) {
 	// Only git's exact `Reapply "…"` shape counts.
-	if !commit.IsReapplyTopic(`Reapply "CX-99: risky change"`) {
+	if !commit.IsReapplyTopic(`Reapply "PROJ-99: risky change"`) {
 		t.Error(`expected Reapply "…" to be a reapply`)
 	}
 
-	notReapply := []string{`Revert "CX-99"`, "reapply the change", `Reapply CX-99`, ""}
+	notReapply := []string{`Revert "PROJ-99"`, "reapply the change", `Reapply PROJ-99`, ""}
 	for _, topic := range notReapply {
 		if commit.IsReapplyTopic(topic) {
 			t.Errorf("expected %q not to be a reapply", topic)
@@ -60,8 +60,8 @@ func TestIsReapplyTopic(t *testing.T) {
 }
 
 func TestPrimaryIssueID(t *testing.T) {
-	if got := (commit.Commit{JiraIssueIDs: []string{"CX-1", "CX-2"}}).PrimaryIssueID(); got != "CX-1" {
-		t.Errorf("got %q, want CX-1", got)
+	if got := (commit.Commit{JiraIssueIDs: []string{"PROJ-1", "PROJ-2"}}).PrimaryIssueID(); got != "PROJ-1" {
+		t.Errorf("got %q, want PROJ-1", got)
 	}
 
 	if got := (commit.Commit{}).PrimaryIssueID(); got != "" {

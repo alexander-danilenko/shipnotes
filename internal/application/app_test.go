@@ -85,16 +85,16 @@ func TestRunRejectsInvalidCommit(t *testing.T) {
 
 func TestRunSearchesWhenJQLProvided(t *testing.T) {
 	repo := fakeRepo{valid: true, commits: []commit.Commit{
-		{CanonicalHash: "h1", Hash: "h1", Topic: "CX-1: thing", JiraIssueIDs: []string{"CX-1"}, Authors: []string{"Jane"}},
+		{CanonicalHash: "h1", Hash: "h1", Topic: "PROJ-1: thing", JiraIssueIDs: []string{"PROJ-1"}, Authors: []string{"Jane"}},
 	}}
 
 	// A non-empty JQL -> the searcher port resolves the release issue list.
-	searcher := &fakeSearcher{keys: []string{"CX-1"}}
+	searcher := &fakeSearcher{keys: []string{"PROJ-1"}}
 	writer := &fakeWriter{}
 
 	result, err := newService(repo, writer, searcher).Run(context.Background(), application.Input{
 		CommitHash: "HEAD~1",
-		JQL:        "key IN (CX-1)",
+		JQL:        "key IN (PROJ-1)",
 	})
 	if err != nil {
 		t.Fatalf("run: %v", err)
@@ -104,8 +104,8 @@ func TestRunSearchesWhenJQLProvided(t *testing.T) {
 		t.Error("expected the searcher port to be called when --jql is provided")
 	}
 
-	if searcher.gotJQL != "key IN (CX-1)" {
-		t.Errorf("jql: got %q, want %q", searcher.gotJQL, "key IN (CX-1)")
+	if searcher.gotJQL != "key IN (PROJ-1)" {
+		t.Errorf("jql: got %q, want %q", searcher.gotJQL, "key IN (PROJ-1)")
 	}
 
 	if result.CommitCount != 1 {
@@ -123,7 +123,7 @@ func TestRunSearchesWhenJQLProvided(t *testing.T) {
 
 func TestRunSkipsSearchWhenJQLEmpty(t *testing.T) {
 	repo := fakeRepo{valid: true, commits: []commit.Commit{
-		{CanonicalHash: "h1", Hash: "h1", Topic: "CX-1: thing", JiraIssueIDs: []string{"CX-1"}, Authors: []string{"Jane"}},
+		{CanonicalHash: "h1", Hash: "h1", Topic: "PROJ-1: thing", JiraIssueIDs: []string{"PROJ-1"}, Authors: []string{"Jane"}},
 	}}
 	searcher := &fakeSearcher{}
 

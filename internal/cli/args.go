@@ -113,8 +113,8 @@ Options:
                       "Excluded commits" instead. Useful for hiding noise like
                       docs/chore commits, e.g. '^(chore|docs|test|ci|build)(\(|:)'.
                       The subject carries the Jira key, so you can also exclude by
-                      ticket; anchor it ('\bCX-42\b') to avoid also matching
-                      CX-420. Empty (the default) keeps every commit.
+                      ticket; anchor it ('\bPROJ-42\b') to avoid also matching
+                      PROJ-420. Empty (the default) keeps every commit.
   --jira-email EMAIL  Jira account email. Overrides SHIPNOTES_JIRA_EMAIL.
   --jira-token TOKEN  Jira read-scoped API token. Overrides SHIPNOTES_JIRA_TOKEN.
   --jira-base-url URL Jira site base URL. Overrides SHIPNOTES_JIRA_BASE_URL.
@@ -148,10 +148,10 @@ Examples:
 
   # Everything since a release tag (resolve the tag to a commit first), with an
   # explicit release issue list selected by JQL:
-  shipnotes $(git rev-parse tags/v1.0.0) --jql="key IN (CX-101, CX-102)" -o SHIPNOTES.md
+  shipnotes $(git rev-parse tags/v1.0.0) --jql="key IN (PROJ-101, PROJ-102)" -o SHIPNOTES.md
 
   # Select the release issues by fix version instead of listing keys:
-  shipnotes $(git rev-parse tags/v1.0.0) --jql="project = CX AND fixVersion = 1.0.0"
+  shipnotes $(git rev-parse tags/v1.0.0) --jql="project = PROJ AND fixVersion = 1.0.0"
 
   # Pre-check issues that are closed or verified (custom "done" statuses):
   shipnotes HEAD~20 --checked-statuses="closed|verified"

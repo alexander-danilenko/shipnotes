@@ -56,7 +56,7 @@ shipnotes <commit_hash> \
   -o SHIPNOTES.md \                  # output file (default: SHIPNOTES.md)
   --repo-dir /path/to/repo \         # git repo to read (default: auto-detected)
   --env-file /path/to/.env \         # .env file to load (default: nearest .env)
-  --jql "key IN (CX-101, CX-102)" \  # optional JQL selecting the release issues for the summary
+  --jql "key IN (PROJ-101, PROJ-102)" \  # optional JQL selecting the release issues for the summary
   --checked-statuses "done|qa" \     # regexp of statuses to render as [x] (default: done|ready to release|ready for release)
   --exclude-commits '^(chore|docs):' \ # regexp; matching commits move to "Excluded commits" (default: empty, keep all)
   --jira-base-url https://acme.atlassian.net \ # overrides SHIPNOTES_JIRA_BASE_URL

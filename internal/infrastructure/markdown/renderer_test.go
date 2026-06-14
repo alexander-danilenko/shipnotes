@@ -101,17 +101,17 @@ func TestBuildThenRender(t *testing.T) {
 		JiraBaseURL:   "https://acme.atlassian.net",
 	}
 	commits := []commit.Commit{
-		{CanonicalHash: "h1", Hash: "h1", Topic: "CX-101: login", JiraIssueIDs: []string{"CX-101"}, Authors: []string{"Jane"}},
-		{CanonicalHash: "h2", Hash: "h2", Topic: `Revert "CX-700: oops"`, JiraIssueIDs: []string{"CX-700"}, IsRevert: true, Authors: []string{"Bob"}},
-		{CanonicalHash: "h3", Hash: "h3", Topic: `Reapply "CX-105: bring it back"`, JiraIssueIDs: []string{"CX-105"}, IsReapply: true, Authors: []string{"Cara"}},
+		{CanonicalHash: "h1", Hash: "h1", Topic: "PROJ-101: login", JiraIssueIDs: []string{"PROJ-101"}, Authors: []string{"Jane"}},
+		{CanonicalHash: "h2", Hash: "h2", Topic: `Revert "PROJ-700: oops"`, JiraIssueIDs: []string{"PROJ-700"}, IsRevert: true, Authors: []string{"Bob"}},
+		{CanonicalHash: "h3", Hash: "h3", Topic: `Reapply "PROJ-105: bring it back"`, JiraIssueIDs: []string{"PROJ-105"}, IsReapply: true, Authors: []string{"Cara"}},
 	}
 	provider := fakeProvider{issues: []issue.Issue{
-		{Key: "CX-101", Title: "Login page", Status: "Done"},
-		{Key: "CX-105", Title: "Bring it back", Status: "Done"},
+		{Key: "PROJ-101", Title: "Login page", Status: "Done"},
+		{Key: "PROJ-105", Title: "Bring it back", Status: "Done"},
 	}}
 
 	data, err := notes.NewBuilder(provider, terminal.New(io.Discard), notes.StatusMatcher{}, notes.CommitMatcher{}).
-		Build(context.Background(), coords, commits, []string{"CX-101", "CX-105"})
+		Build(context.Background(), coords, commits, []string{"PROJ-101", "PROJ-105"})
 	if err != nil {
 		t.Fatalf("build: %v", err)
 	}
@@ -125,7 +125,7 @@ func TestBuildThenRender(t *testing.T) {
 		"# Release Notes",
 		"## Release summary",
 		"### Done",
-		"- [ ] [CX-101](https://acme.atlassian.net/browse/CX-101) Login page",
+		"- [ ] [PROJ-101](https://acme.atlassian.net/browse/PROJ-101) Login page",
 		"## Reverted commits",
 		"- [ ] [`h2`](https://github.com/acme/widgets/commit/h2)",
 		"## Reapplied commits",
@@ -133,7 +133,7 @@ func TestBuildThenRender(t *testing.T) {
 		"# Participants",
 		"- `Bob`",
 		"# Commit history",
-		"| Done |",    // CX-101 commit, status text only
+		"| Done |",    // PROJ-101 commit, status text only
 		"| Unknown |", // reverted commit whose issue was not loaded
 	}
 	for _, want := range mustContain {

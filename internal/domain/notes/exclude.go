@@ -13,7 +13,7 @@ import (
 // caller supplies via --exclude-commits and tests against the commit subject.
 // The subject already contains the commit's Jira key (keys are parsed from it),
 // so one pattern lets a release manager drop noise by message — e.g.
-// "^(chore|docs|test):" — or by ticket — e.g. "CX-42". Excluded commits are not
+// "^(chore|docs|test):" — or by ticket — e.g. "PROJ-42". Excluded commits are not
 // deleted: they are listed in their own "Excluded commits" section so the notes
 // stay auditable.
 //
@@ -50,8 +50,8 @@ func NewCommitMatcher(pattern string) (CommitMatcher, error) {
 // Matches reports whether the commit should be excluded. It tests the pattern
 // against the commit subject, which covers both "exclude by message" (a "chore:"
 // prefix) and "exclude by ticket" (the subject carries the Jira key). Because
-// the match is unanchored, "CX-42" also matches "CX-420"; anchor with word
-// boundaries (`\bCX-42\b`) to target one exact key.
+// the match is unanchored, "PROJ-42" also matches "PROJ-420"; anchor with word
+// boundaries (`\bPROJ-42\b`) to target one exact key.
 func (m CommitMatcher) Matches(c commit.Commit) bool {
 	return m.pattern != nil && m.pattern.MatchString(c.Topic)
 }

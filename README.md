@@ -52,16 +52,17 @@ go run . <commit_hash> [options]
 
 ## Quick start
 
-From inside your git repository, generate notes for the last 20 commits, passing the three required Jira values as flags:
+From inside your git repository, generate notes for the last 20 commits. Pass `--jql` to declare the issues you expect in this release, along with the three required Jira values:
 
 ```bash
 shipnotes HEAD~20 \
+  --jql "key IN (PROJ-101, PROJ-200, PROJ-300)" \
   --jira-base-url https://acme.atlassian.net \
   --jira-email you@acme.com \
   --jira-token your-read-scoped-api-token
 ```
 
-That writes `SHIPNOTES.md` to the repository root, inferring the GitHub repository from your `origin` remote. To avoid passing the Jira values on every run, set them as environment variables or in a `.env` file — see [Advanced usage](#advanced-usage).
+That writes `SHIPNOTES.md` to the repository root, inferring the GitHub repository from your `origin` remote. By comparing the issues `--jql` expects against the ones the commits actually reference, `shipnotes` flags any **Missing** (expected, but never committed) and **Extra** (committed, but outside the expected list) — so you can spot work that slipped or sneaked in. To avoid passing the Jira values on every run, set them as environment variables or in a `.env` file — see [Advanced usage](#advanced-usage).
 
 Here's what the generated file looks like:
 
@@ -75,15 +76,19 @@ Here's what the generated file looks like:
 
 ### Done
 
-- [ ] [CX-101](https://acme.atlassian.net/browse/CX-101) Add login page
+- [ ] [PROJ-101](https://acme.atlassian.net/browse/PROJ-101) Add login page
 
 ### In Progress
 
-- [ ] [CX-200](https://acme.atlassian.net/browse/CX-200) Refactor auth
+- [ ] [PROJ-200](https://acme.atlassian.net/browse/PROJ-200) Refactor auth
 
 ## Missing
 
-- [ ] [CX-300](https://acme.atlassian.net/browse/CX-300) Document API
+- [ ] [PROJ-300](https://acme.atlassian.net/browse/PROJ-300) Document API
+
+## Extra
+
+- [ ] [PROJ-150](https://acme.atlassian.net/browse/PROJ-150) Fix password reset
 
 ## Participants
 
@@ -94,7 +99,8 @@ Here's what the generated file looks like:
 
 | Hash | Jira Key | Jira Status | Commit Message | Authors |
 |------|----------|-------------|----------------|---------|
-| [`abc1234`](…/commit/abc1234) | [CX-101](…/browse/CX-101) | Done | CX-101: Add login page ([#42](…/pull/42)) | `Jane Doe` |
+| [`abc1234`](…/commit/abc1234) | [PROJ-101](…/browse/PROJ-101) | Done | PROJ-101: Add login page ([#42](…/pull/42)) | `Jane Doe` |
+| [`9f3c2a1`](…/commit/9f3c2a1) | [PROJ-150](…/browse/PROJ-150) | Done | PROJ-150: Fix password reset | `Alex Smith` |
 | [`def5678`](…/commit/def5678) | N/A | No Issue | chore: tidy up | `Alex Smith`, `Jane Doe` |
 ```
 
@@ -128,10 +134,10 @@ shipnotes <commit_hash> [options]
 shipnotes HEAD~20
 
 # Everything since a release tag, with an explicit expected list via JQL:
-shipnotes $(git rev-parse tags/v1.0.0) --jql="key IN (CX-101, CX-102)" -o SHIPNOTES.md
+shipnotes $(git rev-parse tags/v1.0.0) --jql="key IN (PROJ-101, PROJ-102)" -o SHIPNOTES.md
 
 # Select the expected issues by fix version instead of listing keys:
-shipnotes $(git rev-parse tags/v1.0.0) --jql="project = CX AND fixVersion = 1.0.0"
+shipnotes $(git rev-parse tags/v1.0.0) --jql="project = PROJ AND fixVersion = 1.0.0"
 
 # Pre-check issues that are closed or verified (custom "done" statuses):
 shipnotes HEAD~20 --checked-statuses="closed|verified"
@@ -173,7 +179,7 @@ shipnotes HEAD~5 --repo-dir /path/to/repo --env-file /path/to/.env
 
 The `--jql` flag drives the **Release summary** section. It selects the issues expected in this release.
 
-- **Explicit query** — for example `--jql "key IN (CX-101, CX-102)"` or `--jql "project = CX AND fixVersion = 1.0.0"`. `shipnotes` compares the matching issues against the commits:
+- **Explicit query** — for example `--jql "key IN (PROJ-101, PROJ-102)"` or `--jql "project = PROJ AND fixVersion = 1.0.0"`. `shipnotes` compares the matching issues against the commits:
   - Expected issues found in commits are grouped under their Jira status, sorted alphabetically.
   - Expected issues that never appeared are listed under **Missing**.
   - Committed issues the query didn't match appear under **Extra**.
@@ -191,7 +197,7 @@ The match is anchored to the whole status, so `done` matches `Done` but not `Alm
 
 `--exclude-commits` is the other opt-in opinion, off by default. Its value is a **case-insensitive regular expression** matched against each commit's subject line. The match is **unanchored**, so it catches a prefix or substring.
 
-One pattern can drop commits by type, such as `^(chore|docs|test|ci|build)(\(|:)`. The subject also carries the Jira key, so you can exclude by ticket. Because the match is unanchored, use word boundaries for one exact ticket: `\bCX-42\b` matches `CX-42` but not `CX-420`.
+One pattern can drop commits by type, such as `^(chore|docs|test|ci|build)(\(|:)`. The subject also carries the Jira key, so you can exclude by ticket. Because the match is unanchored, use word boundaries for one exact ticket: `\bPROJ-42\b` matches `PROJ-42` but not `PROJ-420`.
 
 Matching commits leave the commit-history table and the Release summary. They aren't deleted — they move to an "Excluded commits" section, so the notes stay auditable. This section appears even when the range has no Jira issues at all. Exclusion is the first gate: a matched commit is reported only as excluded, even if it's also a revert or reapply. Pass an empty string (the default) to keep every commit.
 

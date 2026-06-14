@@ -42,9 +42,9 @@ func (w *warnRecorder) Warn(message string) { w.warns = append(w.warns, message)
 
 func TestBuildFallbackWarningOnlyWhenNoSelection(t *testing.T) {
 	commits := []commit.Commit{
-		{CanonicalHash: "h1", Hash: "h1", Topic: "CX-101: login", JiraIssueIDs: []string{"CX-101"}, Authors: []string{"Jane"}},
+		{CanonicalHash: "h1", Hash: "h1", Topic: "PROJ-101: login", JiraIssueIDs: []string{"PROJ-101"}, Authors: []string{"Jane"}},
 	}
-	issues := []issue.Issue{issueWithStatus("CX-101", "Login", "Done")}
+	issues := []issue.Issue{issueWithStatus("PROJ-101", "Login", "Done")}
 
 	cases := []struct {
 		name     string
@@ -103,19 +103,19 @@ func newBuilderExcluding(issues []issue.Issue, pattern string) *notes.Builder {
 
 func TestBuildSummaryCategories(t *testing.T) {
 	commits := []commit.Commit{
-		{CanonicalHash: "h1", Hash: "h1", Topic: "CX-101: login", JiraIssueIDs: []string{"CX-101"}, Authors: []string{"Jane Doe"}},
-		{CanonicalHash: "h2", Hash: "h2", Topic: "CX-200: wip", JiraIssueIDs: []string{"CX-200"}, Authors: []string{"alex"}},
-		{CanonicalHash: "h3", Hash: "h3", Topic: `Revert "CX-700: oops"`, JiraIssueIDs: []string{"CX-700"}, IsRevert: true, Authors: []string{"Bob"}},
+		{CanonicalHash: "h1", Hash: "h1", Topic: "PROJ-101: login", JiraIssueIDs: []string{"PROJ-101"}, Authors: []string{"Jane Doe"}},
+		{CanonicalHash: "h2", Hash: "h2", Topic: "PROJ-200: wip", JiraIssueIDs: []string{"PROJ-200"}, Authors: []string{"alex"}},
+		{CanonicalHash: "h3", Hash: "h3", Topic: `Revert "PROJ-700: oops"`, JiraIssueIDs: []string{"PROJ-700"}, IsRevert: true, Authors: []string{"Bob"}},
 		{CanonicalHash: "h4", Hash: "h4", Topic: "chore: tidy", JiraIssueIDs: []string{}, Authors: []string{"alex"}},
 	}
 	builder := newBuilder([]issue.Issue{
-		issueWithStatus("CX-101", "Login page", "Done"),
-		issueWithStatus("CX-200", "Work in progress", "In Progress"),
-		issueWithStatus("CX-300", "Docs", "To Do"),
-		issueWithStatus("CX-700", "Oops", "Done"),
+		issueWithStatus("PROJ-101", "Login page", "Done"),
+		issueWithStatus("PROJ-200", "Work in progress", "In Progress"),
+		issueWithStatus("PROJ-300", "Docs", "To Do"),
+		issueWithStatus("PROJ-700", "Oops", "Done"),
 	})
 
-	data, err := builder.Build(context.Background(), testCoords(), commits, []string{"CX-101", "CX-300"})
+	data, err := builder.Build(context.Background(), testCoords(), commits, []string{"PROJ-101", "PROJ-300"})
 	if err != nil {
 		t.Fatalf("build: %v", err)
 	}
@@ -124,14 +124,14 @@ func TestBuildSummaryCategories(t *testing.T) {
 		t.Fatal("expected a summary, got nil")
 	}
 
-	// CX-101 is in commits and on the release list -> grouped by its status.
-	assertSingleIssue(t, data.Summary.ByStatus, "Done", "CX-101")
-	// CX-300 was expected but never appeared in a commit -> missing.
-	if len(data.Summary.Missing) != 1 || data.Summary.Missing[0].Key != "CX-300" {
-		t.Errorf("missing: got %v, want [CX-300]", data.Summary.Missing)
+	// PROJ-101 is in commits and on the release list -> grouped by its status.
+	assertSingleIssue(t, data.Summary.ByStatus, "Done", "PROJ-101")
+	// PROJ-300 was expected but never appeared in a commit -> missing.
+	if len(data.Summary.Missing) != 1 || data.Summary.Missing[0].Key != "PROJ-300" {
+		t.Errorf("missing: got %v, want [PROJ-300]", data.Summary.Missing)
 	}
-	// CX-200 is in commits but not on the release list -> extra.
-	assertSingleIssue(t, data.Summary.Extra, "In Progress", "CX-200")
+	// PROJ-200 is in commits but not on the release list -> extra.
+	assertSingleIssue(t, data.Summary.Extra, "In Progress", "PROJ-200")
 	// The revert commit shows up under reverted.
 	if len(data.Summary.Reverted) != 1 || data.Summary.Reverted[0].Hash != "h3" {
 		t.Errorf("reverted: got %v, want one commit h3", data.Summary.Reverted)
@@ -143,8 +143,8 @@ func TestBuildSummaryCategories(t *testing.T) {
 // (in-commits, missing, or extra), and a non-matching status is not.
 func TestBuildMarksCheckedStatuses(t *testing.T) {
 	commits := []commit.Commit{
-		{CanonicalHash: "h1", Hash: "h1", Topic: "CX-101: login", JiraIssueIDs: []string{"CX-101"}, Authors: []string{"Jane"}},
-		{CanonicalHash: "h2", Hash: "h2", Topic: "CX-200: wip", JiraIssueIDs: []string{"CX-200"}, Authors: []string{"alex"}},
+		{CanonicalHash: "h1", Hash: "h1", Topic: "PROJ-101: login", JiraIssueIDs: []string{"PROJ-101"}, Authors: []string{"Jane"}},
+		{CanonicalHash: "h2", Hash: "h2", Topic: "PROJ-200: wip", JiraIssueIDs: []string{"PROJ-200"}, Authors: []string{"alex"}},
 	}
 
 	matcher, err := notes.NewStatusMatcher("done|ready to release|ready for release")
@@ -153,42 +153,42 @@ func TestBuildMarksCheckedStatuses(t *testing.T) {
 	}
 
 	provider := fakeProvider{issues: []issue.Issue{
-		issueWithStatus("CX-101", "Login", "Done"),              // in commits + release list
-		issueWithStatus("CX-200", "WIP", "In Progress"),         // in commits, not on release list -> extra
-		issueWithStatus("CX-300", "Ready", "Ready for Release"), // on release list, never shipped -> missing
+		issueWithStatus("PROJ-101", "Login", "Done"),              // in commits + release list
+		issueWithStatus("PROJ-200", "WIP", "In Progress"),         // in commits, not on release list -> extra
+		issueWithStatus("PROJ-300", "Ready", "Ready for Release"), // on release list, never shipped -> missing
 	}}
 	builder := notes.NewBuilder(provider, noopReporter{}, matcher, notes.CommitMatcher{})
 
-	data, err := builder.Build(context.Background(), testCoords(), commits, []string{"CX-101", "CX-300"})
+	data, err := builder.Build(context.Background(), testCoords(), commits, []string{"PROJ-101", "PROJ-300"})
 	if err != nil {
 		t.Fatalf("build: %v", err)
 	}
 
 	// "Done" matches (case-insensitively) -> checked, in the ByStatus list.
 	if got := data.Summary.ByStatus[0].Issues[0]; !got.Checked {
-		t.Errorf("CX-101 (Done): expected checked, got %+v", got)
+		t.Errorf("PROJ-101 (Done): expected checked, got %+v", got)
 	}
 	// "Ready for Release" matches -> checked, in the Missing list.
 	if got := data.Summary.Missing[0]; !got.Checked {
-		t.Errorf("CX-300 (Ready for Release): expected checked, got %+v", got)
+		t.Errorf("PROJ-300 (Ready for Release): expected checked, got %+v", got)
 	}
 	// "In Progress" does not match -> unchecked, in the Extra list.
 	if got := data.Summary.Extra[0].Issues[0]; got.Checked {
-		t.Errorf("CX-200 (In Progress): expected unchecked, got %+v", got)
+		t.Errorf("PROJ-200 (In Progress): expected unchecked, got %+v", got)
 	}
 }
 
 func TestBuildSummaryDefaultsToCommitIssues(t *testing.T) {
 	commits := []commit.Commit{
-		{CanonicalHash: "h1", Hash: "h1", Topic: "CX-101: login", JiraIssueIDs: []string{"CX-101"}, Authors: []string{"Jane Doe"}},
-		{CanonicalHash: "h2", Hash: "h2", Topic: "CX-200: wip", JiraIssueIDs: []string{"CX-200"}, Authors: []string{"alex"}},
-		{CanonicalHash: "h3", Hash: "h3", Topic: `Revert "CX-700: oops"`, JiraIssueIDs: []string{"CX-700"}, IsRevert: true, Authors: []string{"Bob"}},
+		{CanonicalHash: "h1", Hash: "h1", Topic: "PROJ-101: login", JiraIssueIDs: []string{"PROJ-101"}, Authors: []string{"Jane Doe"}},
+		{CanonicalHash: "h2", Hash: "h2", Topic: "PROJ-200: wip", JiraIssueIDs: []string{"PROJ-200"}, Authors: []string{"alex"}},
+		{CanonicalHash: "h3", Hash: "h3", Topic: `Revert "PROJ-700: oops"`, JiraIssueIDs: []string{"PROJ-700"}, IsRevert: true, Authors: []string{"Bob"}},
 		{CanonicalHash: "h4", Hash: "h4", Topic: "chore: tidy", JiraIssueIDs: []string{}, Authors: []string{"alex"}},
 	}
 	builder := newBuilder([]issue.Issue{
-		issueWithStatus("CX-101", "Login page", "Done"),
-		issueWithStatus("CX-200", "Work in progress", "In Progress"),
-		issueWithStatus("CX-700", "Oops", "Done"),
+		issueWithStatus("PROJ-101", "Login page", "Done"),
+		issueWithStatus("PROJ-200", "Work in progress", "In Progress"),
+		issueWithStatus("PROJ-700", "Oops", "Done"),
 	})
 
 	// nil release IDs => default to every issue referenced by the non-revert
@@ -203,8 +203,8 @@ func TestBuildSummaryDefaultsToCommitIssues(t *testing.T) {
 	}
 
 	// Both non-revert issues appear, each grouped under its own status.
-	assertSingleIssue(t, data.Summary.ByStatus[:1], "Done", "CX-101")
-	assertSingleIssue(t, data.Summary.ByStatus[1:], "In Progress", "CX-200")
+	assertSingleIssue(t, data.Summary.ByStatus[:1], "Done", "PROJ-101")
+	assertSingleIssue(t, data.Summary.ByStatus[1:], "In Progress", "PROJ-200")
 
 	if len(data.Summary.Missing) != 0 {
 		t.Errorf("missing: got %v, want none", data.Summary.Missing)
@@ -222,12 +222,12 @@ func TestBuildSummaryDefaultsToCommitIssues(t *testing.T) {
 
 func TestBuildReappliedCommitsStayInFlow(t *testing.T) {
 	commits := []commit.Commit{
-		{CanonicalHash: "h1", Hash: "h1", Topic: "CX-101: login", JiraIssueIDs: []string{"CX-101"}, Authors: []string{"Jane"}},
-		{CanonicalHash: "h2", Hash: "h2", Topic: `Reapply "CX-105: bring it back"`, JiraIssueIDs: []string{"CX-105"}, IsReapply: true, Authors: []string{"Bob"}},
+		{CanonicalHash: "h1", Hash: "h1", Topic: "PROJ-101: login", JiraIssueIDs: []string{"PROJ-101"}, Authors: []string{"Jane"}},
+		{CanonicalHash: "h2", Hash: "h2", Topic: `Reapply "PROJ-105: bring it back"`, JiraIssueIDs: []string{"PROJ-105"}, IsReapply: true, Authors: []string{"Bob"}},
 	}
 	builder := newBuilder([]issue.Issue{
-		issueWithStatus("CX-101", "Login", "Done"),
-		issueWithStatus("CX-105", "Bring it back", "Done"),
+		issueWithStatus("PROJ-101", "Login", "Done"),
+		issueWithStatus("PROJ-105", "Bring it back", "Done"),
 	})
 
 	data, err := builder.Build(context.Background(), testCoords(), commits, nil)
@@ -245,8 +245,8 @@ func TestBuildReappliedCommitsStayInFlow(t *testing.T) {
 	}
 
 	// Unlike a revert, the reapply's issue still counts toward the summary.
-	if !issueInGroups(data.Summary.ByStatus, "CX-105") {
-		t.Error("reapplied commit's issue CX-105 should be counted in the summary")
+	if !issueInGroups(data.Summary.ByStatus, "PROJ-105") {
+		t.Error("reapplied commit's issue PROJ-105 should be counted in the summary")
 	}
 
 	// And the reapply still appears in the commit history table.
@@ -261,16 +261,16 @@ func TestBuildReappliedCommitsStayInFlow(t *testing.T) {
 // revert classification (an excluded revert is reported only as excluded).
 func TestBuildExcludesCommits(t *testing.T) {
 	commits := []commit.Commit{
-		{CanonicalHash: "h1", Hash: "h1", Topic: "CX-101: login", JiraIssueIDs: []string{"CX-101"}, Authors: []string{"Jane"}},
+		{CanonicalHash: "h1", Hash: "h1", Topic: "PROJ-101: login", JiraIssueIDs: []string{"PROJ-101"}, Authors: []string{"Jane"}},
 		{CanonicalHash: "h2", Hash: "h2", Topic: "chore: tidy", JiraIssueIDs: []string{}, Authors: []string{"alex"}},
-		{CanonicalHash: "h3", Hash: "h3", Topic: "docs: CX-200 readme", JiraIssueIDs: []string{"CX-200"}, Authors: []string{"alex"}},
+		{CanonicalHash: "h3", Hash: "h3", Topic: "docs: PROJ-200 readme", JiraIssueIDs: []string{"PROJ-200"}, Authors: []string{"alex"}},
 		{CanonicalHash: "h4", Hash: "h4", Topic: `Revert "chore: tidy"`, JiraIssueIDs: []string{}, IsRevert: true, Authors: []string{"Bob"}},
 	}
 	// An unanchored pattern, so "chore" also matches inside `Revert "chore: tidy"`
 	// — that is how the excluded revert (h4) is caught despite its "Revert" prefix.
 	builder := newBuilderExcluding([]issue.Issue{
-		issueWithStatus("CX-101", "Login page", "Done"),
-		issueWithStatus("CX-200", "Readme", "Done"),
+		issueWithStatus("PROJ-101", "Login page", "Done"),
+		issueWithStatus("PROJ-200", "Readme", "Done"),
 	}, `chore|docs`)
 
 	data, err := builder.Build(context.Background(), testCoords(), commits, nil)
@@ -305,14 +305,14 @@ func TestBuildExcludesCommits(t *testing.T) {
 		t.Errorf("reverted: got %v, want none (the revert was excluded)", data.Summary.Reverted)
 	}
 
-	// The docs commit's issue (CX-200) must not appear in the summary at all.
-	if issueInGroups(data.Summary.ByStatus, "CX-200") {
-		t.Error("CX-200 belonged to an excluded commit and must not be summarized")
+	// The docs commit's issue (PROJ-200) must not appear in the summary at all.
+	if issueInGroups(data.Summary.ByStatus, "PROJ-200") {
+		t.Error("PROJ-200 belonged to an excluded commit and must not be summarized")
 	}
 
 	// The kept commit's issue is still summarized.
-	if !issueInGroups(data.Summary.ByStatus, "CX-101") {
-		t.Error("CX-101 belonged to a kept commit and should be summarized")
+	if !issueInGroups(data.Summary.ByStatus, "PROJ-101") {
+		t.Error("PROJ-101 belonged to a kept commit and should be summarized")
 	}
 }
 
@@ -356,16 +356,16 @@ func TestBuildExcludedCommitsSurfaceWithoutIssues(t *testing.T) {
 
 func TestBuildFlatCommitStatuses(t *testing.T) {
 	commits := []commit.Commit{
-		{CanonicalHash: "h1", Hash: "h1", Topic: "CX-101: login", JiraIssueIDs: []string{"CX-101"}, Authors: []string{"Jane"}},
-		{CanonicalHash: "h2", Hash: "h2", Topic: "CX-200: wip", JiraIssueIDs: []string{"CX-200"}, Authors: []string{"Jane"}},
-		{CanonicalHash: "h3", Hash: "h3", Topic: `Revert "CX-700: oops"`, JiraIssueIDs: []string{"CX-700"}, IsRevert: true, Authors: []string{"Jane"}},
+		{CanonicalHash: "h1", Hash: "h1", Topic: "PROJ-101: login", JiraIssueIDs: []string{"PROJ-101"}, Authors: []string{"Jane"}},
+		{CanonicalHash: "h2", Hash: "h2", Topic: "PROJ-200: wip", JiraIssueIDs: []string{"PROJ-200"}, Authors: []string{"Jane"}},
+		{CanonicalHash: "h3", Hash: "h3", Topic: `Revert "PROJ-700: oops"`, JiraIssueIDs: []string{"PROJ-700"}, IsRevert: true, Authors: []string{"Jane"}},
 		{CanonicalHash: "h4", Hash: "h4", Topic: "chore: tidy", JiraIssueIDs: []string{}, Authors: []string{"Jane"}},
 		{CanonicalHash: "h5", Hash: "h5", Topic: "ZZ-9: unknown", JiraIssueIDs: []string{"ZZ-9"}, Authors: []string{"Jane"}},
 	}
 	builder := newBuilder([]issue.Issue{
-		issueWithStatus("CX-101", "Login", "Done"),
-		issueWithStatus("CX-200", "WIP", "In Progress"),
-		issueWithStatus("CX-700", "Oops", "Ready for Release"),
+		issueWithStatus("PROJ-101", "Login", "Done"),
+		issueWithStatus("PROJ-200", "WIP", "In Progress"),
+		issueWithStatus("PROJ-700", "Oops", "Ready for Release"),
 	})
 
 	data, err := builder.Build(context.Background(), testCoords(), commits, nil)
@@ -401,11 +401,11 @@ func TestBuildFormatsLinksAndAuthors(t *testing.T) {
 	commits := []commit.Commit{{
 		CanonicalHash: "abc1234567890abc1234567890abc1234567890a",
 		Hash:          "abc1234",
-		Topic:         "CX-101: Add login (#42)",
-		JiraIssueIDs:  []string{"CX-101"},
+		Topic:         "PROJ-101: Add login (#42)",
+		JiraIssueIDs:  []string{"PROJ-101"},
 		Authors:       []string{"zoe", "Anna"},
 	}}
-	builder := newBuilder([]issue.Issue{issueWithStatus("CX-101", "Login", "Done")})
+	builder := newBuilder([]issue.Issue{issueWithStatus("PROJ-101", "Login", "Done")})
 
 	data, err := builder.Build(context.Background(), testCoords(), commits, nil)
 	if err != nil {
@@ -414,7 +414,7 @@ func TestBuildFormatsLinksAndAuthors(t *testing.T) {
 
 	view := data.Commits[0]
 
-	wantTopic := "[CX-101](https://acme.atlassian.net/browse/CX-101): Add login " +
+	wantTopic := "[PROJ-101](https://acme.atlassian.net/browse/PROJ-101): Add login " +
 		"([#42](https://github.com/acme/widgets/pull/42))"
 	if view.FormattedTopic != wantTopic {
 		t.Errorf("formatted topic:\n got %q\nwant %q", view.FormattedTopic, wantTopic)
@@ -424,7 +424,7 @@ func TestBuildFormatsLinksAndAuthors(t *testing.T) {
 		t.Errorf("commit url: got %q", view.URL)
 	}
 
-	if view.JiraIssueURL != "https://acme.atlassian.net/browse/CX-101" {
+	if view.JiraIssueURL != "https://acme.atlassian.net/browse/PROJ-101" {
 		t.Errorf("jira url: got %q", view.JiraIssueURL)
 	}
 	// Authors are sorted case-insensitively and wrapped in backticks.

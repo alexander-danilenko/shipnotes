@@ -354,7 +354,7 @@ func groupByStatus(issues []IssueView) []StatusGroup {
 	return groups
 }
 
-// issueNumberPattern captures the numeric part of a key such as "CX-123".
+// issueNumberPattern captures the numeric part of a key such as "PROJ-123".
 var issueNumberPattern = regexp.MustCompile(`-(\d+)$`)
 
 // sortByIssueNumber returns the issues ordered by their trailing number. The
@@ -437,10 +437,10 @@ func convertPRReferences(topic string, coords Coordinates) string {
 	})
 }
 
-// jiraReferencePattern matches an issue key like "CX-123" on word boundaries.
+// jiraReferencePattern matches an issue key like "PROJ-123" on word boundaries.
 var jiraReferencePattern = regexp.MustCompile(`\b([A-Za-z]{2,}-[0-9]+)\b`)
 
-// convertJiraReferences turns "CX-123" into a Markdown link to the issue.
+// convertJiraReferences turns "PROJ-123" into a Markdown link to the issue.
 func convertJiraReferences(topic string, coords Coordinates) string {
 	return jiraReferencePattern.ReplaceAllStringFunc(topic, func(key string) string {
 		return fmt.Sprintf("[%s](%s)", key, jiraBrowseURL(coords.JiraBaseURL, key))

@@ -16,7 +16,7 @@ const sampleLog = `commit aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 Author: Jane Doe <jane@example.com>
 Date: 2024-01-15 10:30:00 +0000
 
-CX-123: Add login page (#42)
+PROJ-123: Add login page (#42)
 
 Implements the login flow.
 
@@ -27,7 +27,7 @@ commit bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
 Author: Alex O'Hara <alex@example.com>
 Date: 2024-01-14 09:00:00 +0000
 
-Revert "CX-99: risky change"
+Revert "PROJ-99: risky change"
 
 This reverts commit deadbeef.
 ---
@@ -43,7 +43,7 @@ commit eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee
 Author: Alex O'Hara <alex@example.com>
 Date: 2024-01-12 07:00:00 +0000
 
-Reapply "CX-99: risky change"
+Reapply "PROJ-99: risky change"
 
 This reverts commit cafebabe.
 ---
@@ -59,19 +59,19 @@ func TestParse(t *testing.T) {
 	assertCommit(t, commits[0], commit.Commit{
 		CanonicalHash: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 		Hash:          "aaaaaaa",
-		Topic:         "CX-123: Add login page (#42)",
+		Topic:         "PROJ-123: Add login page (#42)",
 		IsRevert:      false,
 		Authors:       []string{"Jane Doe", "Bob Smith"},
-		JiraIssueIDs:  []string{"CX-123"},
+		JiraIssueIDs:  []string{"PROJ-123"},
 	})
 
 	assertCommit(t, commits[1], commit.Commit{
 		CanonicalHash: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
 		Hash:          "bbbbbbb",
-		Topic:         `Revert "CX-99: risky change"`,
+		Topic:         `Revert "PROJ-99: risky change"`,
 		IsRevert:      true,
 		Authors:       []string{"Alex O'Hara"},
-		JiraIssueIDs:  []string{"CX-99"},
+		JiraIssueIDs:  []string{"PROJ-99"},
 	})
 
 	assertCommit(t, commits[2], commit.Commit{
@@ -86,10 +86,10 @@ func TestParse(t *testing.T) {
 	assertCommit(t, commits[3], commit.Commit{
 		CanonicalHash: "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
 		Hash:          "eeeeeee",
-		Topic:         `Reapply "CX-99: risky change"`,
+		Topic:         `Reapply "PROJ-99: risky change"`,
 		IsReapply:     true,
 		Authors:       []string{"Alex O'Hara"},
-		JiraIssueIDs:  []string{"CX-99"},
+		JiraIssueIDs:  []string{"PROJ-99"},
 	})
 }
 

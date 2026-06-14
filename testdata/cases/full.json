@@ -8,25 +8,25 @@
       {
         "status": "Done",
         "issues": [
-          { "key": "CX-101", "url": "https://acme.atlassian.net/browse/CX-101", "title": "Add login page", "checked": true },
-          { "key": "CX-105", "url": "https://acme.atlassian.net/browse/CX-105", "title": "Fix logout", "checked": true }
+          { "key": "PROJ-101", "url": "https://acme.atlassian.net/browse/PROJ-101", "title": "Add login page", "checked": true },
+          { "key": "PROJ-105", "url": "https://acme.atlassian.net/browse/PROJ-105", "title": "Fix logout", "checked": true }
         ]
       },
       {
         "status": "In Progress",
         "issues": [
-          { "key": "CX-200", "url": "https://acme.atlassian.net/browse/CX-200", "title": "Refactor auth" }
+          { "key": "PROJ-200", "url": "https://acme.atlassian.net/browse/PROJ-200", "title": "Refactor auth" }
         ]
       },
       {
         "status": "Ready for Release",
         "issues": [
-          { "key": "CX-110", "url": "https://acme.atlassian.net/browse/CX-110", "title": "Polish header", "checked": true }
+          { "key": "PROJ-110", "url": "https://acme.atlassian.net/browse/PROJ-110", "title": "Polish header", "checked": true }
         ]
       }
     ],
     "missing": [
-      { "key": "CX-300", "url": "https://acme.atlassian.net/browse/CX-300", "title": "Document API" }
+      { "key": "PROJ-300", "url": "https://acme.atlassian.net/browse/PROJ-300", "title": "Document API" }
     ],
     "extra": [
       {
@@ -55,10 +55,10 @@
     {
       "hash": "abc1234",
       "url": "https://github.com/acme/widgets/commit/abc1234567890abc1234567890abc1234567890a",
-      "jiraIssueKey": "CX-101",
-      "jiraIssueUrl": "https://acme.atlassian.net/browse/CX-101",
+      "jiraIssueKey": "PROJ-101",
+      "jiraIssueUrl": "https://acme.atlassian.net/browse/PROJ-101",
       "status": "Done",
-      "formattedTopic": "[CX-101](https://acme.atlassian.net/browse/CX-101): Add login page ([#42](https://github.com/acme/widgets/pull/42))",
+      "formattedTopic": "[PROJ-101](https://acme.atlassian.net/browse/PROJ-101): Add login page ([#42](https://github.com/acme/widgets/pull/42))",
       "authors": "`Jane Doe`"
     },
     {

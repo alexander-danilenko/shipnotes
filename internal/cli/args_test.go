@@ -21,7 +21,7 @@ func TestParseArgs(t *testing.T) {
 		{name: "flags after hash", args: []string{"abc1234", "-o", "out.md"}, wantHash: "abc1234", wantOutput: "out.md"},
 		{name: "long output flag", args: []string{"--output", "x.md", "HEAD"}, wantHash: "HEAD", wantOutput: "x.md"},
 		{name: "repo-dir flag", args: []string{"HEAD", "--repo-dir", "/tmp/repo"}, wantHash: "HEAD", wantOutput: "SHIPNOTES.md", wantRepo: "/tmp/repo"},
-		{name: "jql provided", args: []string{"HEAD", "--jql", "key IN (CX-1)"}, wantHash: "HEAD", wantOutput: "SHIPNOTES.md", wantJQL: "key IN (CX-1)"},
+		{name: "jql provided", args: []string{"HEAD", "--jql", "key IN (PROJ-1)"}, wantHash: "HEAD", wantOutput: "SHIPNOTES.md", wantJQL: "key IN (PROJ-1)"},
 		{name: "terminator before hash", args: []string{"-o", "x.md", "--", "abc1234"}, wantHash: "abc1234", wantOutput: "x.md"},
 		{name: "version long flag, no hash needed", args: []string{"--version"}, wantOutput: "SHIPNOTES.md", wantVersion: true},
 		{name: "version short flag", args: []string{"-v"}, wantOutput: "SHIPNOTES.md", wantVersion: true},

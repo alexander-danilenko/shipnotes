@@ -7,7 +7,7 @@
 
 ### Done
 
-- [x] [CX-101](https://acme.atlassian.net/browse/CX-101) Add login page
+- [x] [PROJ-101](https://acme.atlassian.net/browse/PROJ-101) Add login page
 
 
 
@@ -25,4 +25,4 @@
 
 | Hash | Jira Key | Jira Status | Commit Message | Authors |
 |------|----------|-------------|----------------|---------|
-| [`ccc3333`](https://github.com/acme/widgets/commit/ccc3333444555ccc3333444555ccc3333444555c) | [CX-101](https://acme.atlassian.net/browse/CX-101) | Done | [CX-101](https://acme.atlassian.net/browse/CX-101): Add login page | `Jane Doe` |
+| [`ccc3333`](https://github.com/acme/widgets/commit/ccc3333444555ccc3333444555ccc3333444555c) | [PROJ-101](https://acme.atlassian.net/browse/PROJ-101) | Done | [PROJ-101](https://acme.atlassian.net/browse/PROJ-101): Add login page | `Jane Doe` |

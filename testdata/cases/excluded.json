@@ -8,7 +8,7 @@
       {
         "status": "Done",
         "issues": [
-          { "key": "CX-101", "url": "https://acme.atlassian.net/browse/CX-101", "title": "Add login page", "checked": true }
+          { "key": "PROJ-101", "url": "https://acme.atlassian.net/browse/PROJ-101", "title": "Add login page", "checked": true }
         ]
       }
     ],
@@ -33,10 +33,10 @@
     {
       "hash": "ccc3333",
       "url": "https://github.com/acme/widgets/commit/ccc3333444555ccc3333444555ccc3333444555c",
-      "jiraIssueKey": "CX-101",
-      "jiraIssueUrl": "https://acme.atlassian.net/browse/CX-101",
+      "jiraIssueKey": "PROJ-101",
+      "jiraIssueUrl": "https://acme.atlassian.net/browse/PROJ-101",
       "status": "Done",
-      "formattedTopic": "[CX-101](https://acme.atlassian.net/browse/CX-101): Add login page",
+      "formattedTopic": "[PROJ-101](https://acme.atlassian.net/browse/PROJ-101): Add login page",
       "authors": "`Jane Doe`"
     }
   ],

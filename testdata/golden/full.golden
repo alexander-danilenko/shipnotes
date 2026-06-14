@@ -7,21 +7,21 @@
 
 ### Done
 
-- [x] [CX-101](https://acme.atlassian.net/browse/CX-101) Add login page
-- [x] [CX-105](https://acme.atlassian.net/browse/CX-105) Fix logout
+- [x] [PROJ-101](https://acme.atlassian.net/browse/PROJ-101) Add login page
+- [x] [PROJ-105](https://acme.atlassian.net/browse/PROJ-105) Fix logout
 
 ### In Progress
 
-- [ ] [CX-200](https://acme.atlassian.net/browse/CX-200) Refactor auth
+- [ ] [PROJ-200](https://acme.atlassian.net/browse/PROJ-200) Refactor auth
 
 ### Ready for Release
 
-- [x] [CX-110](https://acme.atlassian.net/browse/CX-110) Polish header
+- [x] [PROJ-110](https://acme.atlassian.net/browse/PROJ-110) Polish header
 
 
 ## Missing
 
-- [ ] [CX-300](https://acme.atlassian.net/browse/CX-300) Document API
+- [ ] [PROJ-300](https://acme.atlassian.net/browse/PROJ-300) Document API
 
 
 ## Extra (not in release list)
@@ -47,5 +47,5 @@
 
 | Hash | Jira Key | Jira Status | Commit Message | Authors |
 |------|----------|-------------|----------------|---------|
-| [`abc1234`](https://github.com/acme/widgets/commit/abc1234567890abc1234567890abc1234567890a) | [CX-101](https://acme.atlassian.net/browse/CX-101) | Done | [CX-101](https://acme.atlassian.net/browse/CX-101): Add login page ([#42](https://github.com/acme/widgets/pull/42)) | `Jane Doe` |
+| [`abc1234`](https://github.com/acme/widgets/commit/abc1234567890abc1234567890abc1234567890a) | [PROJ-101](https://acme.atlassian.net/browse/PROJ-101) | Done | [PROJ-101](https://acme.atlassian.net/browse/PROJ-101): Add login page ([#42](https://github.com/acme/widgets/pull/42)) | `Jane Doe` |
 | [`def5678`](https://github.com/acme/widgets/commit/def5678901234def5678901234def5678901234d) | N/A | No Issue | chore: tidy up | `Alex Smith`, `Jane Doe` |

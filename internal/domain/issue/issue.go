@@ -8,7 +8,7 @@ package issue
 // A missing title or status is represented by an empty string; callers decide
 // how to display that (the shipnotes builder shows "Unknown").
 type Issue struct {
-	// Key is the issue key, e.g. "CX-123".
+	// Key is the issue key, e.g. "PROJ-123".
 	Key string
 	// Title is the issue summary/title, or "" when it could not be loaded.
 	Title string

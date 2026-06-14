@@ -40,20 +40,20 @@ func TestLoadByKeysMapsFields(t *testing.T) {
 	// A single issue with a status maps onto the clean domain entity.
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		writeJSON(t, w, searchResponse{Issues: []apiIssue{
-			{Key: "CX-1", Fields: apiFields{Summary: "Login", Status: &apiStatus{Name: "Done"}}},
-			{Key: "CX-2", Fields: apiFields{Summary: "No status"}}, // missing status -> ""
+			{Key: "PROJ-1", Fields: apiFields{Summary: "Login", Status: &apiStatus{Name: "Done"}}},
+			{Key: "PROJ-2", Fields: apiFields{Summary: "No status"}}, // missing status -> ""
 		}})
 	}))
 	defer server.Close()
 
-	issues, err := newTestClient(server.URL).LoadByKeys(context.Background(), []string{"CX-1", "CX-2"})
+	issues, err := newTestClient(server.URL).LoadByKeys(context.Background(), []string{"PROJ-1", "PROJ-2"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
 	want := []issue.Issue{
-		{Key: "CX-1", Title: "Login", Status: "Done"},
-		{Key: "CX-2", Title: "No status", Status: ""},
+		{Key: "PROJ-1", Title: "Login", Status: "Done"},
+		{Key: "PROJ-2", Title: "No status", Status: ""},
 	}
 	for i, w := range want {
 		if issues[i] != w {
@@ -74,18 +74,18 @@ func TestLoadByKeysPaginates(t *testing.T) {
 
 		if r.URL.Query().Get("nextPageToken") == "" {
 			writeJSON(t, w, searchResponse{
-				Issues:        []apiIssue{{Key: "CX-1"}, {Key: "CX-2"}},
+				Issues:        []apiIssue{{Key: "PROJ-1"}, {Key: "PROJ-2"}},
 				NextPageToken: "page-2",
 			})
 
 			return
 		}
 
-		writeJSON(t, w, searchResponse{Issues: []apiIssue{{Key: "CX-3"}}})
+		writeJSON(t, w, searchResponse{Issues: []apiIssue{{Key: "PROJ-3"}}})
 	}))
 	defer server.Close()
 
-	issues, err := newTestClient(server.URL).LoadByKeys(context.Background(), []string{"CX-1", "CX-2", "CX-3"})
+	issues, err := newTestClient(server.URL).LoadByKeys(context.Background(), []string{"PROJ-1", "PROJ-2", "PROJ-3"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -94,8 +94,8 @@ func TestLoadByKeysPaginates(t *testing.T) {
 		t.Errorf("expected 2 paged requests, got %d", requests)
 	}
 
-	if got := keys(issues); strings.Join(got, ",") != "CX-1,CX-2,CX-3" {
-		t.Errorf("issues: got %v, want [CX-1 CX-2 CX-3]", got)
+	if got := keys(issues); strings.Join(got, ",") != "PROJ-1,PROJ-2,PROJ-3" {
+		t.Errorf("issues: got %v, want [PROJ-1 PROJ-2 PROJ-3]", got)
 	}
 }
 
@@ -131,7 +131,7 @@ func TestLoadByKeysAPIError(t *testing.T) {
 	}))
 	defer server.Close()
 
-	_, err := newTestClient(server.URL).LoadByKeys(context.Background(), []string{"CX-1"})
+	_, err := newTestClient(server.URL).LoadByKeys(context.Background(), []string{"PROJ-1"})
 
 	var apiErr *APIError
 	if !errors.As(err, &apiErr) {
@@ -158,7 +158,7 @@ func TestLoadByKeysMalformedJSON(t *testing.T) {
 	}))
 	defer server.Close()
 
-	_, err := newTestClient(server.URL).LoadByKeys(context.Background(), []string{"CX-1"})
+	_, err := newTestClient(server.URL).LoadByKeys(context.Background(), []string{"PROJ-1"})
 
 	var netErr *NetworkError
 	if !errors.As(err, &netErr) {
@@ -193,28 +193,28 @@ func TestSearchByJQLReturnsKeys(t *testing.T) {
 
 		if r.URL.Query().Get("nextPageToken") == "" {
 			writeJSON(t, w, searchResponse{
-				Issues:        []apiIssue{{Key: "CX-1"}, {Key: "CX-2"}},
+				Issues:        []apiIssue{{Key: "PROJ-1"}, {Key: "PROJ-2"}},
 				NextPageToken: "page-2",
 			})
 
 			return
 		}
 
-		writeJSON(t, w, searchResponse{Issues: []apiIssue{{Key: "CX-3"}}})
+		writeJSON(t, w, searchResponse{Issues: []apiIssue{{Key: "PROJ-3"}}})
 	}))
 	defer server.Close()
 
-	keys, err := newTestClient(server.URL).SearchByJQL(context.Background(), "project = CX AND fixVersion = 1.0.0")
+	keys, err := newTestClient(server.URL).SearchByJQL(context.Background(), "project = PROJ AND fixVersion = 1.0.0")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if gotJQL != "project = CX AND fixVersion = 1.0.0" {
+	if gotJQL != "project = PROJ AND fixVersion = 1.0.0" {
 		t.Errorf("jql sent: got %q, want the query verbatim", gotJQL)
 	}
 
-	if strings.Join(keys, ",") != "CX-1,CX-2,CX-3" {
-		t.Errorf("keys: got %v, want [CX-1 CX-2 CX-3]", keys)
+	if strings.Join(keys, ",") != "PROJ-1,PROJ-2,PROJ-3" {
+		t.Errorf("keys: got %v, want [PROJ-1 PROJ-2 PROJ-3]", keys)
 	}
 }
 
@@ -324,9 +324,9 @@ func TestAPIErrorGuidanceByStatus(t *testing.T) {
 }
 
 func TestBuildKeyInJQL(t *testing.T) {
-	got := buildKeyInJQL([]string{"CX-1", "AB-2"})
+	got := buildKeyInJQL([]string{"PROJ-1", "AB-2"})
 
-	want := `key IN ("CX-1","AB-2")`
+	want := `key IN ("PROJ-1","AB-2")`
 	if got != want {
 		t.Errorf("got %q, want %q", got, want)
 	}
@@ -346,7 +346,7 @@ func TestBuildKeyInJQLEscapes(t *testing.T) {
 func TestBuildSearchURL(t *testing.T) {
 	client := newTestClient("https://acme.atlassian.net")
 
-	first := client.buildSearchURL(`key IN ("CX-1")`, "")
+	first := client.buildSearchURL(`key IN ("PROJ-1")`, "")
 	if !strings.Contains(first, "/rest/api/3/search/jql?") {
 		t.Errorf("missing endpoint path: %q", first)
 	}
@@ -359,7 +359,7 @@ func TestBuildSearchURL(t *testing.T) {
 		t.Errorf("expected only summary,status fields: %q", first)
 	}
 
-	next := client.buildSearchURL(`key IN ("CX-1")`, "tok")
+	next := client.buildSearchURL(`key IN ("PROJ-1")`, "tok")
 	if !strings.Contains(next, "nextPageToken=tok") {
 		t.Errorf("expected page token in URL: %q", next)
 	}

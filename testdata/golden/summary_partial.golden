@@ -7,7 +7,7 @@
 
 ### QA
 
-- [ ] [CX-7](https://acme.atlassian.net/browse/CX-7) Edge case
+- [ ] [PROJ-7](https://acme.atlassian.net/browse/PROJ-7) Edge case
 
 
 
@@ -20,4 +20,4 @@
 
 | Hash | Jira Key | Jira Status | Commit Message | Authors |
 |------|----------|-------------|----------------|---------|
-| [`3333333`](https://github.com/acme/widgets/commit/3333333333333333333333333333333333333333) | [CX-7](https://acme.atlassian.net/browse/CX-7) | QA | [CX-7](https://acme.atlassian.net/browse/CX-7): edge case | `Carol` |
+| [`3333333`](https://github.com/acme/widgets/commit/3333333333333333333333333333333333333333) | [PROJ-7](https://acme.atlassian.net/browse/PROJ-7) | QA | [PROJ-7](https://acme.atlassian.net/browse/PROJ-7): edge case | `Carol` |

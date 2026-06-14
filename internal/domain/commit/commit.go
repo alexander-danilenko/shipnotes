@@ -28,7 +28,7 @@ type Commit struct {
 	Topic string
 	// Message is the full commit message body.
 	Message string
-	// JiraIssueIDs are the Jira keys found in the topic (e.g. "CX-123"),
+	// JiraIssueIDs are the Jira keys found in the topic (e.g. "PROJ-123"),
 	// de-duplicated in first-seen order.
 	JiraIssueIDs []string
 	// IsRevert is true when the topic begins with "revert".
@@ -48,7 +48,7 @@ func (c Commit) PrimaryIssueID() string {
 	return c.JiraIssueIDs[0]
 }
 
-// jiraKeyPattern matches a Jira issue key such as "CX-123": two or more letters,
+// jiraKeyPattern matches a Jira issue key such as "PROJ-123": two or more letters,
 // a dash, then digits.
 var jiraKeyPattern = regexp.MustCompile(`[A-Za-z]{2,}-[0-9]+`)
 

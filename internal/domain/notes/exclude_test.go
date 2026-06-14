@@ -22,11 +22,11 @@ func TestCommitMatcher(t *testing.T) {
 
 		// Excluding by ticket: the key lives in the subject, so the pattern matches
 		// it there.
-		{"key in subject matches", "CX-42", commit.Commit{Topic: "fix: thing CX-42"}, true},
-		{"different key is kept", "CX-42", commit.Commit{Topic: "fix: thing CX-99"}, false},
+		{"key in subject matches", "PROJ-42", commit.Commit{Topic: "fix: thing PROJ-42"}, true},
+		{"different key is kept", "PROJ-42", commit.Commit{Topic: "fix: thing PROJ-99"}, false},
 		// Unanchored, so a key prefix over-matches; word boundaries make it exact.
-		{"unanchored key over-matches longer key", "CX-42", commit.Commit{Topic: "fix CX-420"}, true},
-		{"word-anchored key is exact", `\bCX-42\b`, commit.Commit{Topic: "fix CX-420"}, false},
+		{"unanchored key over-matches longer key", "PROJ-42", commit.Commit{Topic: "fix PROJ-420"}, true},
+		{"word-anchored key is exact", `\bPROJ-42\b`, commit.Commit{Topic: "fix PROJ-420"}, false},
 
 		// An empty (or whitespace) pattern excludes nothing.
 		{"empty pattern matches nothing", "", commit.Commit{Topic: "chore: tidy"}, false},
