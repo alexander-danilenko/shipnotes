@@ -70,6 +70,10 @@ The architecture is documented in [`ARCHITECTURE.md`](./ARCHITECTURE.md) (arc42-
 
 When reading the code, start at `internal/application/app.go` — the use case that orchestrates the whole flow through the ports. The file map below is the quick index for *where things live*; ARCHITECTURE.md explains *what and why*.
 
+### Navigating the code
+
+Prefer the **Go language server (`gopls`) via the LSP tool** when it is available — `goToDefinition`, `findReferences`, `documentSymbol`/`workspaceSymbol`, and `goToImplementation` (e.g. "which adapter implements this port?") are faster and more precise than text search across this small hexagonal codebase. It is optional: if `gopls` is not on `PATH`, fall back to `rg`/`fd`. Install it once with `go install golang.org/x/tools/gopls@latest` (it never ships in the binary — dev-only tooling, like `golangci-lint`).
+
 ## Directory map
 
 ```text
