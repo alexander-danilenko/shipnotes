@@ -27,12 +27,19 @@ type Builder struct {
 	// checked decides which issue statuses render as completed ("[x]") checklist
 	// items. The zero value matches nothing, so the default output is unchecked.
 	checked StatusMatcher
+	// excluded decides which commits are dropped from the notes (into the
+	// "Excluded commits" section). The zero value matches nothing, so by default
+	// every commit is kept.
+	excluded CommitMatcher
 }
 
-// NewBuilder wires the builder with its issue provider, progress reporter, and
-// the status matcher that marks completed issues in the summary.
-func NewBuilder(issues issue.Provider, reporter report.Reporter, checked StatusMatcher) *Builder {
-	return &Builder{issues: issues, reporter: reporter, checked: checked}
+// NewBuilder wires the builder with its issue provider, progress reporter, the
+// status matcher that marks completed issues in the summary, and the commit
+// matcher that filters commits out of the notes.
+func NewBuilder(
+	issues issue.Provider, reporter report.Reporter, checked StatusMatcher, excluded CommitMatcher,
+) *Builder {
+	return &Builder{issues: issues, reporter: reporter, checked: checked, excluded: excluded}
 }
 
 // Build loads the relevant issues and produces the full model used to render the
@@ -43,10 +50,15 @@ func (b *Builder) Build(
 	commits []commit.Commit,
 	releaseIssueIDs []string,
 ) (ReleaseNotes, error) {
-	normalCommits, revertedCommits := splitReverted(commits)
+	// Exclusion is the first gate: a commit matched by --exclude-commits leaves
+	// the notes entirely (it is listed only under "Excluded commits"), so every
+	// step below works on the kept commits and never sees the excluded ones.
+	keptCommits, excludedCommits := splitExcluded(commits, b.excluded)
+
+	normalCommits, revertedCommits := splitReverted(keptCommits)
 	reappliedCommits := selectReapplied(normalCommits)
 
-	commitKeys := uniqueSortedJiraKeys(commits)
+	commitKeys := uniqueSortedJiraKeys(keptCommits)
 
 	// When the caller named no release issues, summarize every issue referenced
 	// by the non-revert commits in the range, so all tickets in the diff still
@@ -82,10 +94,14 @@ func (b *Builder) Build(
 	issueMap := indexByKey(issues)
 
 	return ReleaseNotes{
-		Header:  HeaderData{Date: nowISO(), Repository: coords.GithubBaseURL},
-		Summary: b.buildSummary(coords, normalCommits, releaseIssueIDs, issueMap, revertedCommits, reappliedCommits),
-		Commits: b.buildFlatCommits(coords, commits, issueMap),
-		Authors: collectUniqueAuthors(commits),
+		Header: HeaderData{Date: nowISO(), Repository: coords.GithubBaseURL},
+		Summary: b.buildSummary(
+			coords, normalCommits, releaseIssueIDs, issueMap, revertedCommits, reappliedCommits, excludedCommits,
+		),
+		Commits: b.buildFlatCommits(coords, keptCommits, issueMap),
+		// Participants are the authors of the kept commits only: an excluded commit
+		// leaves the notes, so its author is not credited here either.
+		Authors: collectUniqueAuthors(keptCommits),
 	}, nil
 }
 
@@ -163,8 +179,10 @@ func escapeTablePipes(topic string) string {
 }
 
 // buildSummary produces the optional release-summary section. It returns nil
-// only when there are no release issues to show (an empty list, which happens
-// when the range has no non-revert commits carrying an issue key).
+// only when there is nothing to show at all — no release issues and no reverted,
+// reapplied, or excluded commits — so the template omits the whole section. In
+// particular, excluded commits must still be reported (the "Excluded commits"
+// callout keeps the notes auditable) even when the range carries no issue keys.
 func (b *Builder) buildSummary(
 	coords Coordinates,
 	normalCommits []commit.Commit,
@@ -172,11 +190,11 @@ func (b *Builder) buildSummary(
 	issueMap map[string]issue.Issue,
 	revertedCommits []commit.Commit,
 	reappliedCommits []commit.Commit,
+	excludedCommits []commit.Commit,
 ) *SummaryData {
-	if len(releaseIssueIDs) == 0 {
-		return nil
-	}
-
+	// When releaseIssueIDs is empty here, normalCommits carry no keys either (Build
+	// falls back to their keys), so the issue loops below produce nothing and the
+	// summary reflects only the reverted/reapplied/excluded callouts.
 	commitKeys := toSet(uniqueSortedJiraKeys(normalCommits))
 	releaseSet := toSet(releaseIssueIDs)
 
@@ -202,13 +220,20 @@ func (b *Builder) buildSummary(
 		}
 	}
 
-	return &SummaryData{
+	summary := &SummaryData{
 		ByStatus:  groupByStatus(inCommits),
 		Missing:   sortByIssueNumber(missing),
 		Extra:     groupByStatus(extra),
 		Reverted:  flatCommitViews(coords, revertedCommits),
 		Reapplied: flatCommitViews(coords, reappliedCommits),
+		Excluded:  flatCommitViews(coords, excludedCommits),
 	}
+
+	if summary.isEmpty() {
+		return nil
+	}
+
+	return summary
 }
 
 // flatCommitViews prepares a plain list of commits (reverted or reapplied) for
@@ -223,6 +248,22 @@ func flatCommitViews(coords Coordinates, commits []commit.Commit) []CommitView {
 }
 
 // --- pure helper functions (no dependencies, easy to test) ---
+
+// splitExcluded separates the commits the matcher excludes from the rest,
+// preserving order. It runs before splitReverted, so a commit the caller
+// excludes is reported only under "Excluded commits" even if it is also a revert
+// or reapply.
+func splitExcluded(commits []commit.Commit, matcher CommitMatcher) (kept, excluded []commit.Commit) {
+	for _, c := range commits {
+		if matcher.Matches(c) {
+			excluded = append(excluded, c)
+		} else {
+			kept = append(kept, c)
+		}
+	}
+
+	return kept, excluded
+}
 
 // splitReverted separates revert commits from the rest, preserving order.
 func splitReverted(commits []commit.Commit) (normal, reverted []commit.Commit) {

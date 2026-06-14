@@ -68,7 +68,7 @@ func (noopReporter) Warn(string)    {}
 func (noopReporter) Dim(string)     {}
 
 func newService(repo commit.Repository, writer application.Writer, searcher application.IssueSearcher) *application.Service {
-	builder := notes.NewBuilder(fakeProvider{}, noopReporter{}, notes.StatusMatcher{})
+	builder := notes.NewBuilder(fakeProvider{}, noopReporter{}, notes.StatusMatcher{}, notes.CommitMatcher{})
 	coords := notes.Coordinates{GithubBaseURL: "https://github.com/acme/widgets", JiraBaseURL: "https://acme.atlassian.net"}
 
 	return application.New(repo, builder, fakeRenderer{out: "RENDERED"}, writer, searcher, coords, "/repo")

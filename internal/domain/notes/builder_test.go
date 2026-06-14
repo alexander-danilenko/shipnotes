@@ -62,7 +62,7 @@ func TestBuildFallbackWarningOnlyWhenNoSelection(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			reporter := &warnRecorder{}
-			builder := notes.NewBuilder(fakeProvider{issues: issues}, reporter, notes.StatusMatcher{})
+			builder := notes.NewBuilder(fakeProvider{issues: issues}, reporter, notes.StatusMatcher{}, notes.CommitMatcher{})
 
 			if _, err := builder.Build(context.Background(), testCoords(), commits, tc.release); err != nil {
 				t.Fatalf("unexpected error: %v", err)
@@ -88,7 +88,17 @@ func issueWithStatus(key, title, status string) issue.Issue {
 }
 
 func newBuilder(issues []issue.Issue) *notes.Builder {
-	return notes.NewBuilder(fakeProvider{issues: issues}, noopReporter{}, notes.StatusMatcher{})
+	return notes.NewBuilder(fakeProvider{issues: issues}, noopReporter{}, notes.StatusMatcher{}, notes.CommitMatcher{})
+}
+
+// newBuilderExcluding is newBuilder with an --exclude-commits pattern compiled in.
+func newBuilderExcluding(issues []issue.Issue, pattern string) *notes.Builder {
+	matcher, err := notes.NewCommitMatcher(pattern)
+	if err != nil {
+		panic(err)
+	}
+
+	return notes.NewBuilder(fakeProvider{issues: issues}, noopReporter{}, notes.StatusMatcher{}, matcher)
 }
 
 func TestBuildSummaryCategories(t *testing.T) {
@@ -147,7 +157,7 @@ func TestBuildMarksCheckedStatuses(t *testing.T) {
 		issueWithStatus("CX-200", "WIP", "In Progress"),         // in commits, not on release list -> extra
 		issueWithStatus("CX-300", "Ready", "Ready for Release"), // on release list, never shipped -> missing
 	}}
-	builder := notes.NewBuilder(provider, noopReporter{}, matcher)
+	builder := notes.NewBuilder(provider, noopReporter{}, matcher, notes.CommitMatcher{})
 
 	data, err := builder.Build(context.Background(), testCoords(), commits, []string{"CX-101", "CX-300"})
 	if err != nil {
@@ -242,6 +252,105 @@ func TestBuildReappliedCommitsStayInFlow(t *testing.T) {
 	// And the reapply still appears in the commit history table.
 	if len(data.Commits) != 2 {
 		t.Fatalf("expected 2 commits in history, got %d", len(data.Commits))
+	}
+}
+
+// TestBuildExcludesCommits proves the --exclude-commits filter is the first
+// gate: matched commits leave the history table and their issues leave the
+// summary, they are listed under Excluded instead, and the rule wins over the
+// revert classification (an excluded revert is reported only as excluded).
+func TestBuildExcludesCommits(t *testing.T) {
+	commits := []commit.Commit{
+		{CanonicalHash: "h1", Hash: "h1", Topic: "CX-101: login", JiraIssueIDs: []string{"CX-101"}, Authors: []string{"Jane"}},
+		{CanonicalHash: "h2", Hash: "h2", Topic: "chore: tidy", JiraIssueIDs: []string{}, Authors: []string{"alex"}},
+		{CanonicalHash: "h3", Hash: "h3", Topic: "docs: CX-200 readme", JiraIssueIDs: []string{"CX-200"}, Authors: []string{"alex"}},
+		{CanonicalHash: "h4", Hash: "h4", Topic: `Revert "chore: tidy"`, JiraIssueIDs: []string{}, IsRevert: true, Authors: []string{"Bob"}},
+	}
+	// An unanchored pattern, so "chore" also matches inside `Revert "chore: tidy"`
+	// — that is how the excluded revert (h4) is caught despite its "Revert" prefix.
+	builder := newBuilderExcluding([]issue.Issue{
+		issueWithStatus("CX-101", "Login page", "Done"),
+		issueWithStatus("CX-200", "Readme", "Done"),
+	}, `chore|docs`)
+
+	data, err := builder.Build(context.Background(), testCoords(), commits, nil)
+	if err != nil {
+		t.Fatalf("build: %v", err)
+	}
+
+	// Only the non-excluded commit remains in the history table.
+	if len(data.Commits) != 1 || data.Commits[0].Hash != "h1" {
+		t.Fatalf("commit history: got %v, want only h1", data.Commits)
+	}
+
+	if data.Summary == nil {
+		t.Fatal("expected a summary, got nil")
+	}
+
+	// The chore, the docs commit, and the excluded revert all land under Excluded,
+	// in their original order.
+	wantExcluded := []string{"h2", "h3", "h4"}
+	if len(data.Summary.Excluded) != len(wantExcluded) {
+		t.Fatalf("excluded: got %v, want %v", data.Summary.Excluded, wantExcluded)
+	}
+
+	for i, want := range wantExcluded {
+		if data.Summary.Excluded[i].Hash != want {
+			t.Errorf("excluded[%d]: got %q, want %q", i, data.Summary.Excluded[i].Hash, want)
+		}
+	}
+
+	// The excluded revert is not also reported under Reverted.
+	if len(data.Summary.Reverted) != 0 {
+		t.Errorf("reverted: got %v, want none (the revert was excluded)", data.Summary.Reverted)
+	}
+
+	// The docs commit's issue (CX-200) must not appear in the summary at all.
+	if issueInGroups(data.Summary.ByStatus, "CX-200") {
+		t.Error("CX-200 belonged to an excluded commit and must not be summarized")
+	}
+
+	// The kept commit's issue is still summarized.
+	if !issueInGroups(data.Summary.ByStatus, "CX-101") {
+		t.Error("CX-101 belonged to a kept commit and should be summarized")
+	}
+}
+
+// TestBuildExcludedCommitsSurfaceWithoutIssues guards the auditability promise:
+// even when the range carries no issue keys (so there is no release summary to
+// speak of) and no --jql is given, excluded commits must still be reported under
+// "Excluded commits" rather than silently vanishing. Their authors, however,
+// leave the Participants list along with the commit.
+func TestBuildExcludedCommitsSurfaceWithoutIssues(t *testing.T) {
+	commits := []commit.Commit{
+		{CanonicalHash: "h1", Hash: "h1", Topic: "chore: bump deps", JiraIssueIDs: []string{}, Authors: []string{"bot"}},
+		{CanonicalHash: "h2", Hash: "h2", Topic: "fix: a thing", JiraIssueIDs: []string{}, Authors: []string{"Jane"}},
+	}
+	builder := newBuilderExcluding(nil, `^chore`)
+
+	data, err := builder.Build(context.Background(), testCoords(), commits, nil)
+	if err != nil {
+		t.Fatalf("build: %v", err)
+	}
+
+	if data.Summary == nil {
+		t.Fatal("expected a summary so the excluded commit is still shown, got nil")
+	}
+
+	if len(data.Summary.Excluded) != 1 || data.Summary.Excluded[0].Hash != "h1" {
+		t.Errorf("excluded: got %v, want one commit h1", data.Summary.Excluded)
+	}
+
+	// The kept commit stays in the history; the excluded one does not.
+	if len(data.Commits) != 1 || data.Commits[0].Hash != "h2" {
+		t.Errorf("commit history: got %v, want only h2", data.Commits)
+	}
+
+	// "bot" only authored the excluded commit, so it is not a participant.
+	for _, author := range data.Authors {
+		if author == "bot" {
+			t.Errorf("participants should not include the excluded commit's author: %v", data.Authors)
+		}
 	}
 }
 

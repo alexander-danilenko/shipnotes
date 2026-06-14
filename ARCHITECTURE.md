@@ -18,7 +18,7 @@ Format: **arc42 (light)** — a trimmed subset of the [arc42](https://arc42.org)
 | 1 | **Readability for non-Go readers** | A few obvious lines beat one clever line. Every exported symbol has a plain-English doc comment. |
 | 2 | **Zero runtime dependencies** | One static binary; needs only the `git` command and network access to the Jira REST API. No external Go modules (`go.mod` has no `require` block). |
 | 3 | **Stable output contract** | The exact Markdown produced is locked by golden-file tests; rendering changes are deliberate, reviewed diffs. |
-| 4 | **Workflow-agnostic** | Grouping has no built-in notion of "done": issues are grouped by whatever status names they have. The one opinion is opt-in — `--checked-statuses` (a configurable regexp) marks matching statuses as completed checkboxes; it defaults to a "done"-like pattern but can be emptied to disable. Works on any repo and any Jira setup with zero config. |
+| 4 | **Workflow-agnostic** | Grouping has no built-in notion of "done": issues are grouped by whatever status names they have. The opinions are opt-in: `--checked-statuses` (a configurable regexp) marks matching statuses as completed checkboxes (defaults to a "done"-like pattern, emptyable to disable), and `--exclude-commits` (a regexp, empty by default) drops matching commits from the notes into an "Excluded commits" section. Works on any repo and any Jira setup with zero config. |
 
 **Primary use case:** a developer runs `shipnotes <commit_hash>` and gets a `SHIPNOTES.md` summarizing everything between that commit and `HEAD`.
 
@@ -87,9 +87,10 @@ cli  ──▶  application  ──▶  domain  ◀──  infrastructure
 
 ### Level 2 — domain internals
 
-- **`notes.Builder`** (`domain/notes/builder.go`) — the domain service that turns commits + issues into the `notes.ReleaseNotes` model. Depends on `issue.Provider` and `report.Reporter` ports, and holds a `notes.StatusMatcher` that marks completed issues.
+- **`notes.Builder`** (`domain/notes/builder.go`) — the domain service that turns commits + issues into the `notes.ReleaseNotes` model. Depends on `issue.Provider` and `report.Reporter` ports, and holds a `notes.StatusMatcher` (marks completed issues) and a `notes.CommitMatcher` (excludes commits). Exclusion is the first gate: a matched commit leaves the history and summary and is listed only under "Excluded commits", even if it is also a revert/reapply.
 - **`notes.StatusMatcher`** (`domain/notes/status.go`) — a domain value wrapping a compiled, case-insensitive, fully-anchored regexp; decides which issue statuses render as completed (`[x]`) checklist items. Its zero value (and an empty pattern) matches nothing, keeping checking opt-in.
-- **`notes` model** (`domain/notes/model.go`) — `ReleaseNotes`, `HeaderData`, `CommitView`, `IssueView` (with a `Checked` flag for the checkbox state), `StatusGroup`, `SummaryData`, plus `Coordinates` (repo/Jira base URLs as a domain value object). The JSON tags double as the on-disk shape of the golden-test fixtures.
+- **`notes.CommitMatcher`** (`domain/notes/exclude.go`) — a domain value wrapping a compiled, case-insensitive, **unanchored** regexp (it matches a prefix/substring, not a whole value); decides which commits `--exclude-commits` drops, testing the commit subject (which carries the Jira key, so one pattern excludes by type or by ticket). Its zero value (and an empty pattern) matches nothing, keeping exclusion opt-in.
+- **`notes` model** (`domain/notes/model.go`) — `ReleaseNotes`, `HeaderData`, `CommitView`, `IssueView` (with a `Checked` flag for the checkbox state), `StatusGroup`, `SummaryData` (including the `Excluded` commit list), plus `Coordinates` (repo/Jira base URLs as a domain value object). The JSON tags double as the on-disk shape of the golden-test fixtures.
 - **`commit` / `issue` entities** — `Commit` (with revert/reapply/key rules) and `Issue` (the loaded issue's key, title, and status).
 
 ### Supporting infrastructure (non-port helpers)
@@ -108,9 +109,9 @@ flags ─▶ validate commit ─▶ git log ─▶ parse commits ─▶ load Jir
 
 Step by step:
 
-1. **`cli.Run`** parses args (including the optional `--jql` query), compiles the `--checked-statuses` regexp into a `notes.StatusMatcher` (a bad pattern fails fast before any git/Jira work), resolves the repo dir, and sets up a signal-cancellable `context.Context`.
+1. **`cli.Run`** parses args (including the optional `--jql` query), compiles the `--checked-statuses` and `--exclude-commits` regexps into a `notes.StatusMatcher` and a `notes.CommitMatcher` (a bad pattern fails fast before any git/Jira work), resolves the repo dir, and sets up a signal-cancellable `context.Context`.
 2. **`loadSettings`** infers GitHub org/repo/base-URL from the git remote, then `config.Load` reads + validates env (real env always wins over `.env`).
-3. **`buildService`** (composition root) wires the concrete adapters into `application.Service`, passing the `notes.StatusMatcher` into `notes.NewBuilder`.
+3. **`buildService`** (composition root) wires the concrete adapters into `application.Service`, passing the `notes.StatusMatcher` and `notes.CommitMatcher` into `notes.NewBuilder`.
 4. **`Service.Run`**: `repo.Validate` → `repo.Log` → (if `--jql` given) `searcher.SearchByJQL` → `builder.Build` (calls `issue.Provider.LoadByKeys`) → `renderer.Render` → `writer.Write`.
 5. **`cli.generate`** presents the result (commit count + output path) and returns the process exit code.
 
@@ -129,7 +130,7 @@ Step by step:
 - **Error handling** — return errors with descriptive, user-facing prose; handle with the early-return guard pattern; no panics (except `template.Must`).
 - **Progress reporting** — the `report.Reporter` port keeps the domain free of the terminal; `infrastructure/terminal` provides colored output via a small ANSI helper.
 - **Output stability** — the Markdown template (`markdown/templates/shipnotes.tmpl`) plus golden tests are the output contract (see §11 / the testing strategy).
-- **Workflow-agnosticism** — no hard-coded "done" statuses in grouping; issues are grouped by their status text, sorted alphabetically. The single, opt-in opinion is `--checked-statuses` (a `notes.StatusMatcher`), which only sets the checkbox state and can be disabled with an empty pattern.
+- **Workflow-agnosticism** — no hard-coded "done" statuses in grouping; issues are grouped by their status text, sorted alphabetically. The two opt-in opinions are `--checked-statuses` (a `notes.StatusMatcher`, sets the checkbox state) and `--exclude-commits` (a `notes.CommitMatcher`, filters commits out); both are disabled by an empty pattern, restoring fully neutral output.
 
 ## 9. Architecture decisions
 
@@ -144,6 +145,7 @@ Step by step:
 | **`--jql` as the sole release-issue source (no `--ids`, no interactive prompt)** | One non-interactive, script-friendly input; JQL expresses both explicit key lists (`key IN (…)`) and richer selections (`fixVersion`, `project`). The Jira search reuses the existing `/search/jql` adapter. Omitting `--jql` falls back to summarizing every issue in the commit range. |
 | **Warn (don't fail) when `--jql` matches no issues** | A zero-result query is valid but rarely intended, so the Jira adapter emits a warning and the run continues with the commit-range fallback. The builder distinguishes "no selection" (nil list → fallback note) from "selection matched nothing" (non-nil empty list → adapter already warned), so the user sees one clear message, not two. |
 | **`--checked-statuses` as an opt-in regexp marking completed issues** | Status grouping stays workflow-agnostic, but the checklist boxes carry one configurable opinion: issues whose full status text matches a case-insensitive regexp render as `[x]`. The match is a domain value (`notes.StatusMatcher`), anchored (`^(?:…)$`) so a pattern matches a whole status not a substring, defaulting to `done\|ready to release\|ready for release`. An empty pattern disables checking and restores fully status-neutral output. Reverted/reapplied lists have no status, so they stay unchecked. |
+| **`--exclude-commits` as an opt-in regexp filtering commits** | Lets a release manager drop noise (docs/chore/etc.) without hiding it: matched commits are *relocated*, not deleted, to an "Excluded commits" section so the notes stay auditable (it renders even when the range has no Jira issues). The match is a domain value (`notes.CommitMatcher`), **unanchored** (it matches a prefix/substring like `^(chore\|docs):`, unlike the whole-value `StatusMatcher`), tested against the commit subject — which carries the Jira key, so one pattern excludes by type or by ticket. It is the first gate (an excluded commit never also appears under reverted/reapplied or in the summary, and its author drops from Participants), and is empty by default so the standard output is unchanged. |
 | **Status-specific Jira API error messages with Jira's own detail** | `infrastructure/jira` parses the error body (`errorMessages`) and tailors the "Possible causes / Troubleshooting" guidance per HTTP status (400 → JQL, 401 → credentials, 403 → permissions, 404 → endpoint, 429 → rate limit), so a malformed JQL points at the query instead of generic credential advice. |
 | **Release via GoReleaser + GitHub Actions (tag-triggered)** | Reproducible cross-platform binaries with checksums on every `v*` tag, with no hand-built release steps; the tooling is CI-only and keeps the binary dependency-free. |
 

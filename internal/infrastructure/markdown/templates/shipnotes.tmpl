@@ -45,6 +45,13 @@ Repository: {{ .Header.Repository }}
 - [ ] [`{{ .Hash }}`]({{ .URL }}) {{ .FormattedTopic }}
 {{ end }}
 {{ end -}}
+{{ if .Summary.Excluded -}}
+## Excluded commits
+
+{{ range .Summary.Excluded -}}
+- [ ] [`{{ .Hash }}`]({{ .URL }}) {{ .FormattedTopic }}
+{{ end }}
+{{ end -}}
 {{ end }}
 ---
 

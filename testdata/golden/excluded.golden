@@ -1,0 +1,33 @@
+# Release Notes
+
+Generated: 2024-03-01T09:00:00.000000
+
+Repository: https://github.com/acme/widgets
+
+## Release summary
+
+### Done
+
+- [x] [CX-101](https://acme.atlassian.net/browse/CX-101) Add login page
+
+
+
+
+## Excluded commits
+
+- [ ] [`aaa1111`](https://github.com/acme/widgets/commit/aaa1111222333aaa1111222333aaa1111222333a) chore: bump dependencies
+- [ ] [`bbb2222`](https://github.com/acme/widgets/commit/bbb2222333444bbb2222333444bbb2222333444b) docs: rewrite the README
+
+
+---
+
+# Participants
+
+- `Jane Doe`
+---
+
+# Commit history
+
+| Hash | Jira Key | Jira Status | Commit Message | Authors |
+|------|----------|-------------|----------------|---------|
+| [`ccc3333`](https://github.com/acme/widgets/commit/ccc3333444555ccc3333444555ccc3333444555c) | [CX-101](https://acme.atlassian.net/browse/CX-101) | Done | [CX-101](https://acme.atlassian.net/browse/CX-101): Add login page | `Jane Doe` |

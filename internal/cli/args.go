@@ -21,6 +21,11 @@ type options struct {
 	// checkedStatuses is the regular expression whose matching issue statuses are
 	// rendered as completed ("[x]") checklist items. Empty disables checking.
 	checkedStatuses string
+	// excludeCommits is the regular expression matched against each commit's
+	// subject (which carries its Jira key); matching commits are dropped from the
+	// notes into the "Excluded commits" section. Empty (the default) excludes
+	// nothing.
+	excludeCommits string
 	// showVersion is set by -v/--version; it makes the program print its
 	// version and exit, without requiring the commit_hash argument.
 	showVersion bool
@@ -40,6 +45,8 @@ func registerFlags(fs *flag.FlagSet, opts *options) {
 	fs.StringVar(&opts.jql, "jql", "", "JQL query selecting the release issues (e.g. 'key IN (PROJ-123, PROJ-456)')")
 	fs.StringVar(&opts.checkedStatuses, "checked-statuses", defaultCheckedStatuses,
 		"Case-insensitive regexp; issues whose status fully matches render as checked ([x]). Empty disables.")
+	fs.StringVar(&opts.excludeCommits, "exclude-commits", "",
+		"Case-insensitive regexp; commits whose subject matches are excluded from the notes. Empty keeps all.")
 	fs.BoolVar(&opts.showVersion, "v", false, "Show the version and exit")
 	fs.BoolVar(&opts.showVersion, "version", false, "Show the version and exit")
 
@@ -86,6 +93,15 @@ Options:
                       completed checklist items ("[x]") in the summary. Default:
                       'done|ready to release|ready for release'. Pass an empty
                       string ("") to disable and leave every box unchecked.
+  --exclude-commits REGEXP
+                      Case-insensitive regular expression matched (unanchored)
+                      against each commit's subject; matching commits are dropped
+                      from the commit history and the summary and listed under
+                      "Excluded commits" instead. Useful for hiding noise like
+                      docs/chore commits, e.g. '^(chore|docs|test|ci|build)(\(|:)'.
+                      The subject carries the Jira key, so you can also exclude by
+                      ticket; anchor it ('\bCX-42\b') to avoid also matching
+                      CX-420. Empty (the default) keeps every commit.
   -v, --version       Show the version and exit.
   -h, --help          Show this help and exit.
 
@@ -116,6 +132,9 @@ Examples:
 
   # Pre-check issues that are closed or verified (custom "done" statuses):
   shipnotes HEAD~20 --checked-statuses="closed|verified"
+
+  # Drop docs/chore/test commits from the notes (they move to "Excluded commits"):
+  shipnotes HEAD~20 --exclude-commits='^(chore|docs|test|ci|build)(\(|:)'
 
   # Everything since the most recent tag:
   shipnotes $(git rev-parse "$(git describe --tags --abbrev=0)")

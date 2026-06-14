@@ -83,4 +83,15 @@ type SummaryData struct {
 	// issue summary — a reapply re-ships the change — and are surfaced here only
 	// as a callout for reviewers.
 	Reapplied []CommitView `json:"reapplied"`
+	// Excluded: commits dropped from the notes by the --exclude-commits filter.
+	// They are kept here, not deleted, so the notes remain auditable — a reviewer
+	// can see exactly what was filtered out and why nothing is hidden.
+	Excluded []CommitView `json:"excluded"`
+}
+
+// isEmpty reports whether the summary has no content in any of its sections, so
+// the builder can return nil and let the template omit the whole summary block.
+func (s *SummaryData) isEmpty() bool {
+	return len(s.ByStatus) == 0 && len(s.Missing) == 0 && len(s.Extra) == 0 &&
+		len(s.Reverted) == 0 && len(s.Reapplied) == 0 && len(s.Excluded) == 0
 }

@@ -60,6 +60,16 @@ func Run(args []string, version string) int {
 		return 1
 	}
 
+	// Compile the --exclude-commits regexp up front too, for the same fail-fast
+	// reason. The zero value (empty pattern) excludes nothing.
+	excluded, err := notes.NewCommitMatcher(options.excludeCommits)
+	if err != nil {
+		console.Failure("💥 " + err.Error())
+		console.Dim("Run 'shipnotes --help' for usage.")
+
+		return 1
+	}
+
 	repoDir, err := resolveRepoDir(options.repoDir)
 	if err != nil {
 		console.Failure("💥 " + err.Error())
@@ -77,7 +87,7 @@ func Run(args []string, version string) int {
 		return 1
 	}
 
-	service := buildService(settings, repoDir, console, checked)
+	service := buildService(settings, repoDir, console, checked, excluded)
 
 	return generate(ctx, console, service, application.Input{
 		CommitHash: options.commitHash,
@@ -125,10 +135,11 @@ func generate(
 // service. This is the composition root: the one spot that knows which concrete
 // implementation backs each port.
 func buildService(
-	settings config.Settings, repoDir string, console *terminal.Console, checked notes.StatusMatcher,
+	settings config.Settings, repoDir string, console *terminal.Console,
+	checked notes.StatusMatcher, excluded notes.CommitMatcher,
 ) *application.Service {
 	jiraClient := jira.New(settings.JiraBaseURL, settings.JiraEmail, settings.JiraReadAPIToken, console)
-	builder := notes.NewBuilder(jiraClient, console, checked)
+	builder := notes.NewBuilder(jiraClient, console, checked, excluded)
 	coords := notes.Coordinates{
 		GithubBaseURL: settings.GithubBaseURL,
 		JiraBaseURL:   settings.JiraBaseURL,

@@ -110,7 +110,7 @@ func TestBuildThenRender(t *testing.T) {
 		{Key: "CX-105", Title: "Bring it back", Status: "Done"},
 	}}
 
-	data, err := notes.NewBuilder(provider, terminal.New(io.Discard), notes.StatusMatcher{}).
+	data, err := notes.NewBuilder(provider, terminal.New(io.Discard), notes.StatusMatcher{}, notes.CommitMatcher{}).
 		Build(context.Background(), coords, commits, []string{"CX-101", "CX-105"})
 	if err != nil {
 		t.Fatalf("build: %v", err)

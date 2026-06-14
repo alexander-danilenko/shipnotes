@@ -1,0 +1,44 @@
+{
+  "header": {
+    "date": "2024-03-01T09:00:00.000000",
+    "repository": "https://github.com/acme/widgets"
+  },
+  "summary": {
+    "byStatus": [
+      {
+        "status": "Done",
+        "issues": [
+          { "key": "CX-101", "url": "https://acme.atlassian.net/browse/CX-101", "title": "Add login page", "checked": true }
+        ]
+      }
+    ],
+    "missing": null,
+    "extra": null,
+    "reverted": null,
+    "reapplied": null,
+    "excluded": [
+      {
+        "hash": "aaa1111",
+        "url": "https://github.com/acme/widgets/commit/aaa1111222333aaa1111222333aaa1111222333a",
+        "formattedTopic": "chore: bump dependencies"
+      },
+      {
+        "hash": "bbb2222",
+        "url": "https://github.com/acme/widgets/commit/bbb2222333444bbb2222333444bbb2222333444b",
+        "formattedTopic": "docs: rewrite the README"
+      }
+    ]
+  },
+  "commits": [
+    {
+      "hash": "ccc3333",
+      "url": "https://github.com/acme/widgets/commit/ccc3333444555ccc3333444555ccc3333444555c",
+      "jiraIssueKey": "CX-101",
+      "jiraIssueUrl": "https://acme.atlassian.net/browse/CX-101",
+      "status": "Done",
+      "formattedTopic": "[CX-101](https://acme.atlassian.net/browse/CX-101): Add login page",
+      "authors": "`Jane Doe`"
+    }
+  ],
+  "authors": ["Jane Doe"]
+}

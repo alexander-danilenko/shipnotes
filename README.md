@@ -98,6 +98,7 @@ shipnotes <commit_hash> [options]
 | `--env-file FILE` | nearest `.env` | `.env` file to load. |
 | `--jql "QUERY"` | *summarize all* | JQL query whose matching issues become the expected release list (the "Release summary" section). |
 | `--checked-statuses REGEXP` | `done\|ready to release\|ready for release` | Case-insensitive regexp matched against each issue's full status; matching issues render as completed (`[x]`) in the summary. Pass `""` to disable. |
+| `--exclude-commits REGEXP` | *empty* | Case-insensitive (unanchored) regexp matched against each commit's subject; matching commits are dropped from the notes into an "Excluded commits" section. Empty keeps every commit. |
 | `-v`, `--version` | | Show the version and exit. |
 | `-h`, `--help` | | Show full help and exit. |
 
@@ -112,7 +113,11 @@ Grouping never decides which statuses mean "done" — it just shows each issue's
 
 ### Checked statuses
 
-`--checked-statuses` is the one place the tool takes an opinion, and it is opt-in. Its value is a **case-insensitive regular expression** matched against each issue's *full* status text; every issue whose status matches renders as a completed checkbox (`[x]`) in the summary instead of an empty one (`[ ]`). The match is anchored to the whole status, so `done` checks a status of `Done` but not `Almost Done`; use alternation for several statuses (the default is `done|ready to release|ready for release`). Pass an empty string (`--checked-statuses=""`) to check nothing and keep the output fully status-neutral. The grouping and the commit-history table are unaffected — only the checkbox state changes.
+`--checked-statuses` is one of two opt-in opinions the tool takes. Its value is a **case-insensitive regular expression** matched against each issue's *full* status text; every issue whose status matches renders as a completed checkbox (`[x]`) in the summary instead of an empty one (`[ ]`). The match is anchored to the whole status, so `done` checks a status of `Done` but not `Almost Done`; use alternation for several statuses (the default is `done|ready to release|ready for release`). Pass an empty string (`--checked-statuses=""`) to check nothing and keep the output fully status-neutral. The grouping and the commit-history table are unaffected — only the checkbox state changes.
+
+### Excluded commits
+
+`--exclude-commits` is the other opt-in opinion, and it is empty (off) by default. Its value is a **case-insensitive regular expression** matched — **unanchored**, so it catches a prefix or substring — against each commit's subject line, so one pattern can drop commits by type (`^(chore|docs|test|ci|build)(\(|:)`) or by ticket. The subject carries the Jira key, so a key works too; because the match is unanchored, anchor it with word boundaries (`\bCX-42\b`) when you mean one exact ticket and not also `CX-420`. Matching commits leave the commit-history table and the Release summary entirely; they are **not** deleted but **relocated** to an "Excluded commits" callout, so the notes stay auditable — they appear even when the range has no Jira issues at all. Exclusion is the first gate: a matched commit is reported only as excluded, even if it is also a revert or reapply. Pass an empty string (the default) to keep every commit.
 
 ### Examples
 
@@ -128,6 +133,9 @@ shipnotes $(git rev-parse tags/v1.0.0) --jql="project = CX AND fixVersion = 1.0.
 
 # Pre-check issues that are closed or verified (custom "done" statuses):
 shipnotes HEAD~20 --checked-statuses="closed|verified"
+
+# Drop docs/chore/test commits from the notes (they move to "Excluded commits"):
+shipnotes HEAD~20 --exclude-commits='^(chore|docs|test|ci|build)(\(|:)'
 
 # Everything since the most recent tag:
 shipnotes $(git rev-parse "$(git describe --tags --abbrev=0)")
