@@ -3,6 +3,7 @@
 
 # AI Workflow internal docs.
 docs/
+.remember/
 
 # Editor / OS noise.
 .idea/
