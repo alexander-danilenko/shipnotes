@@ -108,20 +108,18 @@ shipnotes <commit_hash> [options]
 
 ### Options
 
-| Flag | Default | Description |
-|------|---------|-------------|
-| `-o`, `--output FILE` | `SHIPNOTES.md` | Output file. A relative path is written inside the repository directory. |
-| `--repo-dir DIR` | auto-detected | Git repository to read, searched from the current directory upward. |
-| `--env-file FILE` | nearest `.env` | `.env` file to load. |
-| `--jql "QUERY"` | *summarize all* | JQL query whose matching issues become the expected release list (the "Release summary" section). |
-| `--checked-statuses REGEXP` | `done\|ready to release\|ready for release` | Case-insensitive regexp matched against each issue's full status; matching issues render as completed (`[x]`) in the summary. Pass `""` to disable. |
-| `--exclude-commits REGEXP` | *empty* | Case-insensitive (unanchored) regexp matched against each commit's subject; matching commits are dropped from the notes into an "Excluded commits" section. Empty keeps every commit. |
-| `--jira-base-url URL` | from env | Jira base URL. Overrides `SHIPNOTES_JIRA_BASE_URL`. |
-| `--jira-email EMAIL` | from env | Jira account email. Overrides `SHIPNOTES_JIRA_EMAIL`. |
-| `--jira-token TOKEN` | from env | Jira read-scoped API token. Overrides `SHIPNOTES_JIRA_TOKEN`. |
-| `--github-repo REPO` | inferred | GitHub repo as a URL, SSH remote, or `org/repo`. Overrides `SHIPNOTES_GITHUB_REPO`; inferred from the git remote when unset. |
-| `-v`, `--version` | | Show the version and exit. |
-| `-h`, `--help` | | Show full help and exit. |
+- **`-o`, `--output FILE`** — Output file (default: `SHIPNOTES.md`). A relative path is written inside the repository directory.
+- **`--repo-dir DIR`** — Git repository to read, searched from the current directory upward (default: auto-detected).
+- **`--env-file FILE`** — `.env` file to load (default: nearest `.env`).
+- **`--jql "QUERY"`** — JQL query whose matching issues become the expected release list (the "Release summary" section). When omitted, every issue found in the range is summarized.
+- **`--checked-statuses REGEXP`** — Case-insensitive regexp matched against each issue's full status; matching issues render as completed (`[x]`) in the summary. Pass `""` to disable (default: `done|ready to release|ready for release`).
+- **`--exclude-commits REGEXP`** — Case-insensitive (unanchored) regexp matched against each commit's subject; matching commits are dropped from the notes into an "Excluded commits" section. Empty keeps every commit (default: empty).
+- **`--jira-base-url URL`** — Jira base URL. Overrides `SHIPNOTES_JIRA_BASE_URL` (default: from env).
+- **`--jira-email EMAIL`** — Jira account email. Overrides `SHIPNOTES_JIRA_EMAIL` (default: from env).
+- **`--jira-token TOKEN`** — Jira read-scoped API token. Overrides `SHIPNOTES_JIRA_TOKEN` (default: from env).
+- **`--github-repo REPO`** — GitHub repo as a URL, SSH remote, or `org/repo`. Overrides `SHIPNOTES_GITHUB_REPO`; inferred from the git remote when unset.
+- **`-v`, `--version`** — Show the version and exit.
+- **`-h`, `--help`** — Show full help and exit.
 
 ### Examples
 
