@@ -97,6 +97,7 @@ shipnotes <commit_hash> [options]
 | `--repo-dir DIR` | auto-detected | Git repository to read, searched from the current directory upward. |
 | `--env-file FILE` | nearest `.env` | `.env` file to load. |
 | `--jql "QUERY"` | *summarize all* | JQL query whose matching issues become the expected release list (the "Release summary" section). |
+| `--checked-statuses REGEXP` | `done\|ready to release\|ready for release` | Case-insensitive regexp matched against each issue's full status; matching issues render as completed (`[x]`) in the summary. Pass `""` to disable. |
 | `-v`, `--version` | | Show the version and exit. |
 | `-h`, `--help` | | Show full help and exit. |
 
@@ -107,7 +108,11 @@ The `--jql` flag drives the **Release summary** section by selecting the issues 
 - **Explicit query** (`--jql "key IN (CX-101, CX-102)"` or any JQL, e.g. `--jql "project = CX AND fixVersion = 1.0.0"`) — every issue the query matches is compared against the commits. Expected issues found in commits are grouped under their Jira status (sorted alphabetically); expected issues that never appeared are listed under **Missing**; committed issues not matched by the query appear under **Extra**.
 - **Omitted** (or a query matching nothing) — the summary defaults to *every* Jira ticket referenced in the commit range, grouped by status. **Missing** and **Extra** are then always empty.
 
-The tool never decides which statuses mean "done" — it just shows each issue's status text and lets you read release readiness from the groups.
+Grouping never decides which statuses mean "done" — it just shows each issue's status text and lets you read release readiness from the groups.
+
+### Checked statuses
+
+`--checked-statuses` is the one place the tool takes an opinion, and it is opt-in. Its value is a **case-insensitive regular expression** matched against each issue's *full* status text; every issue whose status matches renders as a completed checkbox (`[x]`) in the summary instead of an empty one (`[ ]`). The match is anchored to the whole status, so `done` checks a status of `Done` but not `Almost Done`; use alternation for several statuses (the default is `done|ready to release|ready for release`). Pass an empty string (`--checked-statuses=""`) to check nothing and keep the output fully status-neutral. The grouping and the commit-history table are unaffected — only the checkbox state changes.
 
 ### Examples
 
@@ -120,6 +125,9 @@ shipnotes $(git rev-parse tags/v1.0.0) --jql="key IN (CX-101, CX-102)" -o SHIPNO
 
 # Select the expected issues by fix version instead of listing keys:
 shipnotes $(git rev-parse tags/v1.0.0) --jql="project = CX AND fixVersion = 1.0.0"
+
+# Pre-check issues that are closed or verified (custom "done" statuses):
+shipnotes HEAD~20 --checked-statuses="closed|verified"
 
 # Everything since the most recent tag:
 shipnotes $(git rev-parse "$(git describe --tags --abbrev=0)")

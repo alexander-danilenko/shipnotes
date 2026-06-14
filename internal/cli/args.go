@@ -18,10 +18,17 @@ type options struct {
 	// jql is the optional JQL query selecting the release issue list, or "" when
 	// --jql was not supplied (the builder then summarizes every issue in range).
 	jql string
+	// checkedStatuses is the regular expression whose matching issue statuses are
+	// rendered as completed ("[x]") checklist items. Empty disables checking.
+	checkedStatuses string
 	// showVersion is set by -v/--version; it makes the program print its
 	// version and exit, without requiring the commit_hash argument.
 	showVersion bool
 }
+
+// defaultCheckedStatuses is the regular expression used for --checked-statuses
+// when the flag is not given: issues in a "done"-like status are pre-checked.
+const defaultCheckedStatuses = "done|ready to release|ready for release"
 
 // registerFlags declares every command-line flag on fs, binding it to the
 // destination in opts. It also installs the usage message.
@@ -31,6 +38,8 @@ func registerFlags(fs *flag.FlagSet, opts *options) {
 	fs.StringVar(&opts.repoDir, "repo-dir", "", "Git repository directory (defaults to current directory)")
 	fs.StringVar(&opts.envFile, "env-file", "", "Path to the .env file to load (defaults to the nearest .env)")
 	fs.StringVar(&opts.jql, "jql", "", "JQL query selecting the release issues (e.g. 'key IN (PROJ-123, PROJ-456)')")
+	fs.StringVar(&opts.checkedStatuses, "checked-statuses", defaultCheckedStatuses,
+		"Case-insensitive regexp; issues whose status fully matches render as checked ([x]). Empty disables.")
 	fs.BoolVar(&opts.showVersion, "v", false, "Show the version and exit")
 	fs.BoolVar(&opts.showVersion, "version", false, "Show the version and exit")
 
@@ -71,6 +80,12 @@ Options:
                       summary" section, e.g. 'key IN (PROJ-123, PROJ-456)'. If
                       omitted, every issue found in the commit range is
                       summarized instead.
+  --checked-statuses REGEXP
+                      Case-insensitive regular expression matched against each
+                      issue's full status text; matching issues are rendered as
+                      completed checklist items ("[x]") in the summary. Default:
+                      'done|ready to release|ready for release'. Pass an empty
+                      string ("") to disable and leave every box unchecked.
   -v, --version       Show the version and exit.
   -h, --help          Show this help and exit.
 
@@ -98,6 +113,9 @@ Examples:
 
   # Select the release issues by fix version instead of listing keys:
   shipnotes $(git rev-parse tags/v1.0.0) --jql="project = CX AND fixVersion = 1.0.0"
+
+  # Pre-check issues that are closed or verified (custom "done" statuses):
+  shipnotes HEAD~20 --checked-statuses="closed|verified"
 
   # Everything since the most recent tag:
   shipnotes $(git rev-parse "$(git describe --tags --abbrev=0)")

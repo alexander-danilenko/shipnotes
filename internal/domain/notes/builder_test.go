@@ -62,7 +62,7 @@ func TestBuildFallbackWarningOnlyWhenNoSelection(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			reporter := &warnRecorder{}
-			builder := notes.NewBuilder(fakeProvider{issues: issues}, reporter)
+			builder := notes.NewBuilder(fakeProvider{issues: issues}, reporter, notes.StatusMatcher{})
 
 			if _, err := builder.Build(context.Background(), testCoords(), commits, tc.release); err != nil {
 				t.Fatalf("unexpected error: %v", err)
@@ -88,7 +88,7 @@ func issueWithStatus(key, title, status string) issue.Issue {
 }
 
 func newBuilder(issues []issue.Issue) *notes.Builder {
-	return notes.NewBuilder(fakeProvider{issues: issues}, noopReporter{})
+	return notes.NewBuilder(fakeProvider{issues: issues}, noopReporter{}, notes.StatusMatcher{})
 }
 
 func TestBuildSummaryCategories(t *testing.T) {
@@ -125,6 +125,46 @@ func TestBuildSummaryCategories(t *testing.T) {
 	// The revert commit shows up under reverted.
 	if len(data.Summary.Reverted) != 1 || data.Summary.Reverted[0].Hash != "h3" {
 		t.Errorf("reverted: got %v, want one commit h3", data.Summary.Reverted)
+	}
+}
+
+// TestBuildMarksCheckedStatuses proves the status matcher flows into every issue
+// list of the summary: a matching status is checked wherever the issue appears
+// (in-commits, missing, or extra), and a non-matching status is not.
+func TestBuildMarksCheckedStatuses(t *testing.T) {
+	commits := []commit.Commit{
+		{CanonicalHash: "h1", Hash: "h1", Topic: "CX-101: login", JiraIssueIDs: []string{"CX-101"}, Authors: []string{"Jane"}},
+		{CanonicalHash: "h2", Hash: "h2", Topic: "CX-200: wip", JiraIssueIDs: []string{"CX-200"}, Authors: []string{"alex"}},
+	}
+
+	matcher, err := notes.NewStatusMatcher("done|ready to release|ready for release")
+	if err != nil {
+		t.Fatalf("compile matcher: %v", err)
+	}
+
+	provider := fakeProvider{issues: []issue.Issue{
+		issueWithStatus("CX-101", "Login", "Done"),              // in commits + release list
+		issueWithStatus("CX-200", "WIP", "In Progress"),         // in commits, not on release list -> extra
+		issueWithStatus("CX-300", "Ready", "Ready for Release"), // on release list, never shipped -> missing
+	}}
+	builder := notes.NewBuilder(provider, noopReporter{}, matcher)
+
+	data, err := builder.Build(context.Background(), testCoords(), commits, []string{"CX-101", "CX-300"})
+	if err != nil {
+		t.Fatalf("build: %v", err)
+	}
+
+	// "Done" matches (case-insensitively) -> checked, in the ByStatus list.
+	if got := data.Summary.ByStatus[0].Issues[0]; !got.Checked {
+		t.Errorf("CX-101 (Done): expected checked, got %+v", got)
+	}
+	// "Ready for Release" matches -> checked, in the Missing list.
+	if got := data.Summary.Missing[0]; !got.Checked {
+		t.Errorf("CX-300 (Ready for Release): expected checked, got %+v", got)
+	}
+	// "In Progress" does not match -> unchecked, in the Extra list.
+	if got := data.Summary.Extra[0].Issues[0]; got.Checked {
+		t.Errorf("CX-200 (In Progress): expected unchecked, got %+v", got)
 	}
 }
 

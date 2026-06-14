@@ -11,14 +11,14 @@ Repository: {{ .Header.Repository }}
 ### {{ .Status }}
 
 {{ range .Issues -}}
-- [ ] [{{ .Key }}]({{ .URL }}) {{ .Title }}
+- [{{ if .Checked }}x{{ else }} {{ end }}] [{{ .Key }}]({{ .URL }}) {{ .Title }}
 {{ end }}
 {{ end }}{{ end }}
 {{ if .Summary.Missing -}}
 ## Missing
 
 {{ range .Summary.Missing -}}
-- [ ] [{{ .Key }}]({{ .URL }}) {{ .Title }}
+- [{{ if .Checked }}x{{ else }} {{ end }}] [{{ .Key }}]({{ .URL }}) {{ .Title }}
 {{ end }}
 {{ end }}
 {{ if .Summary.Extra -}}
@@ -27,7 +27,7 @@ Repository: {{ .Header.Repository }}
 {{ range .Summary.Extra }}{{ if .Issues -}}
 **{{ .Status }}**
 {{ range .Issues -}}
-- [ ] [{{ .Key }}]({{ .URL }}) {{ .Title }}
+- [{{ if .Checked }}x{{ else }} {{ end }}] [{{ .Key }}]({{ .URL }}) {{ .Title }}
 {{ end }}
 {{ end }}{{ end -}}
 {{ end }}

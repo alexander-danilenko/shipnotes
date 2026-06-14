@@ -24,11 +24,15 @@ const unknownValue = "Unknown"
 type Builder struct {
 	issues   issue.Provider
 	reporter report.Reporter
+	// checked decides which issue statuses render as completed ("[x]") checklist
+	// items. The zero value matches nothing, so the default output is unchecked.
+	checked StatusMatcher
 }
 
-// NewBuilder wires the builder with its issue provider and progress reporter.
-func NewBuilder(issues issue.Provider, reporter report.Reporter) *Builder {
-	return &Builder{issues: issues, reporter: reporter}
+// NewBuilder wires the builder with its issue provider, progress reporter, and
+// the status matcher that marks completed issues in the summary.
+func NewBuilder(issues issue.Provider, reporter report.Reporter, checked StatusMatcher) *Builder {
+	return &Builder{issues: issues, reporter: reporter, checked: checked}
 }
 
 // Build loads the relevant issues and produces the full model used to render the
@@ -180,7 +184,7 @@ func (b *Builder) buildSummary(
 
 	for _, key := range releaseIssueIDs {
 		found, hasIssue := issueMap[key]
-		view := issueView(coords, key, found, hasIssue)
+		view := issueView(coords, key, found, hasIssue, b.checked)
 
 		if commitKeys[key] {
 			inCommits = append(inCommits, view)
@@ -194,7 +198,7 @@ func (b *Builder) buildSummary(
 	for _, key := range sortedKeys(commitKeys) {
 		if !releaseSet[key] {
 			found, hasIssue := issueMap[key]
-			extra = append(extra, issueView(coords, key, found, hasIssue))
+			extra = append(extra, issueView(coords, key, found, hasIssue, b.checked))
 		}
 	}
 
@@ -250,8 +254,9 @@ func selectReapplied(commits []commit.Commit) []commit.Commit {
 	return reapplied
 }
 
-// issueView builds the display data for one issue.
-func issueView(coords Coordinates, key string, found issue.Issue, hasIssue bool) IssueView {
+// issueView builds the display data for one issue. The checked matcher marks the
+// issue's status as a completed checklist item.
+func issueView(coords Coordinates, key string, found issue.Issue, hasIssue bool, checked StatusMatcher) IssueView {
 	title := unknownValue
 	if hasIssue && found.Title != "" {
 		title = found.Title
@@ -263,10 +268,11 @@ func issueView(coords Coordinates, key string, found issue.Issue, hasIssue bool)
 	}
 
 	return IssueView{
-		Key:    key,
-		Title:  title,
-		URL:    jiraBrowseURL(coords.JiraBaseURL, key),
-		Status: status,
+		Key:     key,
+		Title:   title,
+		URL:     jiraBrowseURL(coords.JiraBaseURL, key),
+		Status:  status,
+		Checked: checked.Matches(status),
 	}
 }
 

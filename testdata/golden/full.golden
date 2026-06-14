@@ -8,8 +8,8 @@ Repository: https://github.com/acme/widgets
 
 ### Done
 
-- [ ] [CX-101](https://acme.atlassian.net/browse/CX-101) Add login page
-- [ ] [CX-105](https://acme.atlassian.net/browse/CX-105) Fix logout
+- [x] [CX-101](https://acme.atlassian.net/browse/CX-101) Add login page
+- [x] [CX-105](https://acme.atlassian.net/browse/CX-105) Fix logout
 
 ### In Progress
 
@@ -17,7 +17,7 @@ Repository: https://github.com/acme/widgets
 
 ### Ready for Release
 
-- [ ] [CX-110](https://acme.atlassian.net/browse/CX-110) Polish header
+- [x] [CX-110](https://acme.atlassian.net/browse/CX-110) Polish header
 
 
 ## Missing
@@ -28,7 +28,7 @@ Repository: https://github.com/acme/widgets
 ## Extra (not in release list)
 
 **Done**
-- [ ] [OPS-9](https://acme.atlassian.net/browse/OPS-9) Bump deps
+- [x] [OPS-9](https://acme.atlassian.net/browse/OPS-9) Bump deps
 
 
 ## Reverted commits

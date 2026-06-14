@@ -50,6 +50,16 @@ func Run(args []string, version string) int {
 		return 0
 	}
 
+	// Compile the --checked-statuses regexp up front so a bad pattern fails fast,
+	// before any git or Jira work, with the same hint as other argument errors.
+	checked, err := notes.NewStatusMatcher(options.checkedStatuses)
+	if err != nil {
+		console.Failure("💥 " + err.Error())
+		console.Dim("Run 'shipnotes --help' for usage.")
+
+		return 1
+	}
+
 	repoDir, err := resolveRepoDir(options.repoDir)
 	if err != nil {
 		console.Failure("💥 " + err.Error())
@@ -67,7 +77,7 @@ func Run(args []string, version string) int {
 		return 1
 	}
 
-	service := buildService(settings, repoDir, console)
+	service := buildService(settings, repoDir, console, checked)
 
 	return generate(ctx, console, service, application.Input{
 		CommitHash: options.commitHash,
@@ -114,9 +124,11 @@ func generate(
 // buildService wires the concrete infrastructure adapters into the application
 // service. This is the composition root: the one spot that knows which concrete
 // implementation backs each port.
-func buildService(settings config.Settings, repoDir string, console *terminal.Console) *application.Service {
+func buildService(
+	settings config.Settings, repoDir string, console *terminal.Console, checked notes.StatusMatcher,
+) *application.Service {
 	jiraClient := jira.New(settings.JiraBaseURL, settings.JiraEmail, settings.JiraReadAPIToken, console)
-	builder := notes.NewBuilder(jiraClient, console)
+	builder := notes.NewBuilder(jiraClient, console, checked)
 	coords := notes.Coordinates{
 		GithubBaseURL: settings.GithubBaseURL,
 		JiraBaseURL:   settings.JiraBaseURL,

@@ -8,8 +8,8 @@
       {
         "status": "Done",
         "issues": [
-          { "key": "CX-101", "url": "https://acme.atlassian.net/browse/CX-101", "title": "Add login page" },
-          { "key": "CX-105", "url": "https://acme.atlassian.net/browse/CX-105", "title": "Fix logout" }
+          { "key": "CX-101", "url": "https://acme.atlassian.net/browse/CX-101", "title": "Add login page", "checked": true },
+          { "key": "CX-105", "url": "https://acme.atlassian.net/browse/CX-105", "title": "Fix logout", "checked": true }
         ]
       },
       {
@@ -21,7 +21,7 @@
       {
         "status": "Ready for Release",
         "issues": [
-          { "key": "CX-110", "url": "https://acme.atlassian.net/browse/CX-110", "title": "Polish header" }
+          { "key": "CX-110", "url": "https://acme.atlassian.net/browse/CX-110", "title": "Polish header", "checked": true }
         ]
       }
     ],
@@ -32,7 +32,7 @@
       {
         "status": "Done",
         "issues": [
-          { "key": "OPS-9", "url": "https://acme.atlassian.net/browse/OPS-9", "title": "Bump deps" }
+          { "key": "OPS-9", "url": "https://acme.atlassian.net/browse/OPS-9", "title": "Bump deps", "checked": true }
         ]
       }
     ],

@@ -52,6 +52,10 @@ type IssueView struct {
 	Title  string `json:"title"`
 	URL    string `json:"url"`
 	Status string `json:"status"`
+	// Checked marks the issue's status as completed, rendering its checklist box
+	// as "[x]" instead of "[ ]". It is set by the builder from the caller's
+	// --checked-statuses matcher; it is false by default (no status is "done").
+	Checked bool `json:"checked"`
 }
 
 // StatusGroup is a set of issues that share the same status.
