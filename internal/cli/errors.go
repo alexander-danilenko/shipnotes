@@ -16,12 +16,13 @@ func printConfigError(console *terminal.Console, err error) {
 		return
 	}
 
-	console.Failure("\n💥 Environment validation failed")
-	console.Dim("Missing or invalid environment variables:\n")
+	console.Failure("\n💥 Configuration validation failed")
+	console.Dim("Missing or invalid configuration (set a flag or the environment variable):\n")
 
 	for _, problem := range validationErr.Problems {
 		console.Warn(fmt.Sprintf("  • %s: %s", problem.Field, problem.Message))
 	}
 
-	console.Dim("\nPlease check your .env file or copy .env.example")
+	console.Dim("\nPass the values as flags (--jira-base-url, --jira-email, --jira-token) " +
+		"or set them in your environment or .env file (copy .env.example).")
 }

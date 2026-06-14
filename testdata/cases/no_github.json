@@ -1,0 +1,35 @@
+{
+  "header": {
+    "date": "2024-02-20T08:00:00.000000",
+    "repository": ""
+  },
+  "summary": {
+    "byStatus": [
+      {
+        "status": "Done",
+        "issues": [
+          { "key": "AB-1", "title": "Login page", "url": "https://acme.atlassian.net/browse/AB-1", "status": "Done", "checked": true }
+        ]
+      }
+    ],
+    "missing": null,
+    "extra": null,
+    "reverted": [
+      { "hash": "2222222", "url": "", "formattedTopic": "Revert \"AB-2: oops\"", "authors": "`Bob`", "status": "", "jiraIssueKey": "", "jiraIssueUrl": "" }
+    ],
+    "reapplied": null,
+    "excluded": null
+  },
+  "commits": [
+    {
+      "hash": "1111111",
+      "url": "",
+      "jiraIssueKey": "AB-1",
+      "jiraIssueUrl": "https://acme.atlassian.net/browse/AB-1",
+      "status": "Done",
+      "formattedTopic": "[AB-1](https://acme.atlassian.net/browse/AB-1): add login (#42)",
+      "authors": "`Alice`"
+    }
+  ],
+  "authors": ["Alice", "Bob"]
+}

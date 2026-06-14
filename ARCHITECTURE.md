@@ -48,7 +48,7 @@ Format: **arc42 (light)** — a trimmed subset of the [arc42](https://arc42.org)
 | The user | in: commit hash + flags; out: a Markdown file + console progress | `flag`, stdout/stdin |
 | A git repository | in: refs, commit log | the `git` CLI as a subprocess |
 | Jira | in: issue fields (summary, status) | Jira REST API, read-only, over HTTPS |
-| Configuration | in: 6 env vars (3 inferable from the git remote) | real env + nearest `.env` |
+| Configuration | in: 3 Jira values + an optional GitHub repo (the repo inferable from the git remote) | flags + real env + nearest `.env` |
 
 ## 4. Solution strategy
 
@@ -95,8 +95,8 @@ cli  ──▶  application  ──▶  domain  ◀──  infrastructure
 
 ### Supporting infrastructure (non-port helpers)
 
-- `infrastructure/git/remote.go` — infers org / repo / GitHub base URL from the git remote (`origin`, then `upstream`), resolving SSH host aliases via `ssh -G`.
-- `infrastructure/config/{config.go,dotenv.go}` — loads and validates the 6 env vars (3 fall back to the inferred git-remote defaults); hand-written `.env` reader.
+- `infrastructure/git/remote.go` — `InferRemoteBaseURL` derives the GitHub base URL from the git remote (`origin`, then `upstream`), resolving SSH host aliases via `ssh -G`; `ParseGithubSpec` turns an explicit `--github-repo`/`SHIPNOTES_GITHUB_REPO` value (a URL, an SSH remote, or the bare `org/repo` shorthand → `github.com`) into the same base URL.
+- `infrastructure/config/{config.go,dotenv.go}` — `LoadDotEnv` reads the `.env`; `Load` validates the three required Jira values (a flag overrides the environment) and records the already-resolved, optional GitHub base URL. Hand-written `.env` reader.
 
 ## 6. Runtime view
 
@@ -110,7 +110,7 @@ flags ─▶ validate commit ─▶ git log ─▶ parse commits ─▶ load Jir
 Step by step:
 
 1. **`cli.Run`** parses args (including the optional `--jql` query), compiles the `--checked-statuses` and `--exclude-commits` regexps into a `notes.StatusMatcher` and a `notes.CommitMatcher` (a bad pattern fails fast before any git/Jira work), resolves the repo dir, and sets up a signal-cancellable `context.Context`.
-2. **`loadSettings`** infers GitHub org/repo/base-URL from the git remote, then `config.Load` reads + validates env (real env always wins over `.env`).
+2. **`loadSettings`** loads the `.env`, then resolves the optional GitHub base URL (`--github-repo`/`SHIPNOTES_GITHUB_REPO`, else the inferred git remote — a flag/env value that cannot be parsed is fatal; it warns when none resolves or the host is not `github.com`), then `config.Load` validates the Jira values (flag over env, real env over `.env`).
 3. **`buildService`** (composition root) wires the concrete adapters into `application.Service`, passing the `notes.StatusMatcher` and `notes.CommitMatcher` into `notes.NewBuilder`.
 4. **`Service.Run`**: `repo.Validate` → `repo.Log` → (if `--jql` given) `searcher.SearchByJQL` → `builder.Build` (calls `issue.Provider.LoadByKeys`) → `renderer.Render` → `writer.Write`.
 5. **`cli.generate`** presents the result (commit count + output path) and returns the process exit code.
@@ -121,12 +121,12 @@ Step by step:
 
 - **Build:** `go build -o shipnotes .` → one static binary, no install step.
 - **Run anywhere** Go-built binaries run, provided `git` is on `PATH` and the Jira host is reachable.
-- **Configuration at runtime:** 6 env vars (see `.env.example`). Loaded from the real environment and the nearest `.env` (walking up from the working dir, or an explicit `--env-file`). Three Jira vars are usually all the user must set; the three GitHub vars are inferred from the git remote when unset.
+- **Configuration at runtime:** three required Jira values plus an optional GitHub repository (see `.env.example`). Each is settable as a flag (`--jira-base-url`, `--jira-email`, `--jira-token`, `--github-repo`) or an environment variable; precedence is flag > real env > nearest `.env` (walking up from the working dir, or an explicit `--env-file`). The GitHub repository is inferred from the git remote when unset and is optional — the notes still render (with commit/PR links omitted) when none can be determined.
 - **Release & distribution:** pushing a `v*` tag triggers `.github/workflows/release.yml`, which runs **GoReleaser** (`.goreleaser.yaml`) to cross-compile the binary for linux/darwin/windows × amd64/arm64, package the archives plus a `checksums.txt`, and publish a GitHub release. The release tag is stamped into the binary via `-ldflags -X main.version=…` and reported by `shipnotes --version`. GoReleaser is dev/CI-only tooling — it never ships in the binary, so goal 2 (zero runtime dependencies) still holds.
 
 ## 8. Crosscutting concepts
 
-- **Configuration & inference** — env-var precedence (real env > `.env` > inferred git-remote defaults); see §7 and `infrastructure/config`, `infrastructure/git/remote.go`.
+- **Configuration & inference** — precedence is flag > real env > `.env`; the optional GitHub repository additionally falls back to the inferred git remote. See §7 and `infrastructure/config`, `infrastructure/git/remote.go`.
 - **Error handling** — return errors with descriptive, user-facing prose; handle with the early-return guard pattern; no panics (except `template.Must`).
 - **Progress reporting** — the `report.Reporter` port keeps the domain free of the terminal; `infrastructure/terminal` provides colored output via a small ANSI helper.
 - **Output stability** — the Markdown template (`markdown/templates/shipnotes.tmpl`) plus golden tests are the output contract (see §11 / the testing strategy).
@@ -140,7 +140,9 @@ Step by step:
 | **Zero external dependencies** | Simplicity, security, and a trivial build/run story; the stdlib covers every need. |
 | **Shell out to `git` rather than a Go git library** | Avoids a heavy dependency; matches the "use what's installed" philosophy. |
 | **Golden-file tests for output** | Treats rendered Markdown as a contract; any change is a reviewed diff. |
-| **Infer repo coordinates from the git remote** | Minimizes required configuration to the three Jira variables. |
+| **Infer the GitHub repository from the git remote** | Minimizes required configuration to the three Jira variables in the common case. |
+| **One optional `SHIPNOTES_GITHUB_REPO` / `--github-repo`, replacing the old org/repo/URL trio** | The renderer only ever needed the GitHub *base URL*, so the three coordinate variables collapsed into one. It accepts a URL, an SSH remote, or the bare `org/repo` (assumed `github.com`), parsed by `git.ParseGithubSpec`. It is **optional**: when neither flag, env, nor git remote yields one, the cli warns and renders the notes with commit/PR links omitted — the template degrades to plain hashes and leaves `(#123)` references literal; a non-`github.com` host warns too (the links use GitHub's `/commit/` and `/pull/` scheme). An explicit but unparseable value is fatal, since the user named a specific repo. |
+| **Every config value also settable as a flag (`--jira-*`, `--github-repo`)** | Lets the tool run with no `.env` file (e.g. CI) — a flag takes precedence over the environment. Resolution lives in the cli composition root, which keeps `config` and `git` as independent sibling adapters: `config` validates the Jira values, the cli orchestrates the git-backed GitHub resolution and its warnings. |
 | **Workflow-agnostic status grouping** | Works on any Jira setup without per-project config. |
 | **`--jql` as the sole release-issue source (no `--ids`, no interactive prompt)** | One non-interactive, script-friendly input; JQL expresses both explicit key lists (`key IN (…)`) and richer selections (`fixVersion`, `project`). The Jira search reuses the existing `/search/jql` adapter. Omitting `--jql` falls back to summarizing every issue in the commit range. |
 | **Warn (don't fail) when `--jql` matches no issues** | A zero-result query is valid but rarely intended, so the Jira adapter emits a warning and the run continues with the commit-range fallback. The builder distinguishes "no selection" (nil list → fallback note) from "selection matched nothing" (non-nil empty list → adapter already warned), so the user sees one clear message, not two. |

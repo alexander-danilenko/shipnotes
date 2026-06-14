@@ -1,0 +1,27 @@
+# Release Notes
+
+Generated: 2024-02-20T08:00:00.000000
+
+## Release summary
+
+### Done
+
+- [x] [AB-1](https://acme.atlassian.net/browse/AB-1) Login page
+
+
+
+
+## Reverted commits
+
+- [ ] `2222222` Revert "AB-2: oops"
+
+## Participants
+
+- `Alice`
+- `Bob`
+
+## Commit history
+
+| Hash | Jira Key | Jira Status | Commit Message | Authors |
+|------|----------|-------------|----------------|---------|
+| `1111111` | [AB-1](https://acme.atlassian.net/browse/AB-1) | Done | [AB-1](https://acme.atlassian.net/browse/AB-1): add login (#42) | `Alice` |

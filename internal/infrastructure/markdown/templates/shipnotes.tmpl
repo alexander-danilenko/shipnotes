@@ -2,8 +2,9 @@
 
 Generated: {{ .Header.Date }}
 
-Repository: {{ .Header.Repository }}
+{{ if .Header.Repository }}Repository: {{ .Header.Repository }}
 
+{{ end -}}
 {{ if .Summary -}}
 ## Release summary
 
@@ -35,21 +36,21 @@ Repository: {{ .Header.Repository }}
 ## Reverted commits
 
 {{ range .Summary.Reverted -}}
-- [ ] [`{{ .Hash }}`]({{ .URL }}) {{ .FormattedTopic }}
+- [ ] {{ if .URL }}[`{{ .Hash }}`]({{ .URL }}){{ else }}`{{ .Hash }}`{{ end }} {{ .FormattedTopic }}
 {{ end }}
 {{ end -}}
 {{ if .Summary.Reapplied -}}
 ## Reapplied commits
 
 {{ range .Summary.Reapplied -}}
-- [ ] [`{{ .Hash }}`]({{ .URL }}) {{ .FormattedTopic }}
+- [ ] {{ if .URL }}[`{{ .Hash }}`]({{ .URL }}){{ else }}`{{ .Hash }}`{{ end }} {{ .FormattedTopic }}
 {{ end }}
 {{ end -}}
 {{ if .Summary.Excluded -}}
 ## Excluded commits
 
 {{ range .Summary.Excluded -}}
-- [ ] [`{{ .Hash }}`]({{ .URL }}) {{ .FormattedTopic }}
+- [ ] {{ if .URL }}[`{{ .Hash }}`]({{ .URL }}){{ else }}`{{ .Hash }}`{{ end }} {{ .FormattedTopic }}
 {{ end }}
 {{ end -}}
 {{ end -}}
@@ -65,5 +66,5 @@ Repository: {{ .Header.Repository }}
 | Hash | Jira Key | Jira Status | Commit Message | Authors |
 |------|----------|-------------|----------------|---------|
 {{ range .Commits -}}
-| [`{{ .Hash }}`]({{ .URL }}) | {{ if .JiraIssueKey }}[{{ .JiraIssueKey }}]({{ .JiraIssueURL }}){{ else }}N/A{{ end }} | {{ .Status }} | {{ .FormattedTopic }} | {{ .Authors }} |
+| {{ if .URL }}[`{{ .Hash }}`]({{ .URL }}){{ else }}`{{ .Hash }}`{{ end }} | {{ if .JiraIssueKey }}[{{ .JiraIssueKey }}]({{ .JiraIssueURL }}){{ else }}N/A{{ end }} | {{ .Status }} | {{ .FormattedTopic }} | {{ .Authors }} |
 {{ end -}}

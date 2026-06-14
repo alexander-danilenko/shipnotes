@@ -58,12 +58,16 @@ shipnotes <commit_hash> \
   --env-file /path/to/.env \         # .env file to load (default: nearest .env)
   --jql "key IN (CX-101, CX-102)" \  # optional JQL selecting the release issues for the summary
   --checked-statuses "done|qa" \     # regexp of statuses to render as [x] (default: done|ready to release|ready for release)
-  --exclude-commits '^(chore|docs):' # regexp; matching commits move to "Excluded commits" (default: empty, keep all)
+  --exclude-commits '^(chore|docs):' \ # regexp; matching commits move to "Excluded commits" (default: empty, keep all)
+  --jira-base-url https://acme.atlassian.net \ # overrides SHIPNOTES_JIRA_BASE_URL
+  --jira-email me@acme.com \         # overrides SHIPNOTES_JIRA_EMAIL
+  --jira-token "$JIRA_TOKEN" \       # overrides SHIPNOTES_JIRA_TOKEN
+  --github-repo acme/widgets         # URL, SSH remote, or org/repo; overrides SHIPNOTES_GITHUB_REPO
 ```
 
-It needs six environment variables (see `.env.example`). With `--env-file` you load a specific file (a read error is fatal); otherwise a `.env` file in the current directory — or any parent, found by walking up — is loaded automatically. Real environment variables always take precedence over the file.
+It needs four configuration values, each settable as a flag or an environment variable (see `.env.example`). A flag wins over the environment; with `--env-file` you load a specific file (a read error is fatal); otherwise a `.env` file in the current directory — or any parent, found by walking up — is loaded automatically; a real environment variable always wins over the file.
 
-Three of those six — `SHIPNOTES_REPO_ORG`, `SHIPNOTES_REPO_NAME`, and `SHIPNOTES_GITHUB_URL` — are **inferred from the repository's git remote** when left unset, so in the common case you only configure the three Jira variables. `internal/infrastructure/git/remote.go` reads `origin` (then `upstream`), parses the org and repo out of the remote URL, and builds `https://<host>/<org>/<repo>`. A custom SSH host alias (e.g. `git@github-work:org/repo.git` from `~/.ssh/config`) is resolved to its real hostname via `ssh -G`. An explicitly set environment variable always wins over the inferred value.
+The three Jira values are required. The fourth, `SHIPNOTES_GITHUB_REPO` (or `--github-repo`), is the GitHub repository used to build commit and pull-request links; it accepts a URL, an SSH remote, or the `org/repo` shorthand, and is **inferred from the repository's git remote** when left unset, so in the common case you configure only the three Jira variables. `internal/infrastructure/git/remote.go` reads `origin` (then `upstream`), parses the org and repo out of the remote URL, and builds `https://<host>/<org>/<repo>` (`ParseGithubSpec` does the same for an explicit value, assuming `github.com` for the bare `org/repo` form). A custom SSH host alias (e.g. `git@github-work:org/repo.git` from `~/.ssh/config`) is resolved to its real hostname via `ssh -G`. The GitHub repository is optional: the cli's resolver (`cli.go`) warns and continues — omitting the links — when none resolves, and warns when the host is not `github.com`; an explicit value that cannot be parsed is fatal.
 
 ## Architecture
 
@@ -95,18 +99,18 @@ shipnotes/
 │   ├── infrastructure/               # ADAPTERS — implement the ports.
 │   │   ├── git/         repository.go #   Runs `git`; validates refs (commit.Repository).
 │   │   │               parser.go     #     Raw `git log` text → commit.Commit values.
-│   │   │               remote.go     #     Infers org/repo/GitHub-URL from the remote.
+│   │   │               remote.go     #     Infers/parses the GitHub base URL (remote or --github-repo).
 │   │   ├── jira/       client.go     #   Jira REST API → issue.Issue (issue.Provider + IssueSearcher).
 │   │   │               types.go      #     Jira API response types (JSON only).
 │   │   │               errors.go     #     Friendly network / API error messages.
 │   │   ├── markdown/   renderer.go   #   text/template render (notes.Renderer).
 │   │   │               templates/shipnotes.tmpl  # The Markdown template.
-│   │   ├── config/     config.go     #   Loads + validates the 6 env vars (3 fall
-│   │   │               dotenv.go     #     back to git-remote defaults). .env reader.
+│   │   ├── config/     config.go     #   Loads + validates the 3 Jira vars (flag or
+│   │   │               dotenv.go     #     env); stores the resolved GitHub URL. .env reader.
 │   │   ├── terminal/   terminal.go   #   Colored console output (report.Reporter).
 │   │   └── fileoutput/ writer.go     #   Writes the Markdown file (application.Writer).
 │   └── cli/         cli.go           # Interface layer + composition root.
-│                    args.go          #   Flag parsing, usage, --jql/--checked-statuses/--exclude-commits flags.
+│                    args.go          #   Flag parsing, usage; --jql/--checked-statuses/--exclude-commits, --jira-*/--github-repo flags.
 │                    repo.go          #   Resolves the repository directory.
 │                    errors.go        #   Prints config-validation problems.
 ├── testdata/                         # Test fixtures + golden output (see below).

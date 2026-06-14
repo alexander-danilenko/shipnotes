@@ -485,6 +485,38 @@ func TestBuildDoesNotRewritePRURLAsJira(t *testing.T) {
 	}
 }
 
+// With no GitHub base URL the notes must degrade gracefully: the commit gets no
+// link and a "(#42)" reference is left as written rather than turned into a
+// broken relative link.
+func TestBuildWithoutGithubBaseURL(t *testing.T) {
+	coords := notes.Coordinates{GithubBaseURL: "", JiraBaseURL: "https://acme.atlassian.net"}
+	commits := []commit.Commit{{
+		CanonicalHash: "abc1234567890abc1234567890abc1234567890a",
+		Hash:          "abc1234",
+		Topic:         "fix: a bug (#42)",
+		Authors:       []string{"dev"},
+	}}
+	builder := newBuilder(nil)
+
+	data, err := builder.Build(context.Background(), coords, commits, nil)
+	if err != nil {
+		t.Fatalf("build: %v", err)
+	}
+
+	if data.Header.Repository != "" {
+		t.Errorf("repository should be empty, got %q", data.Header.Repository)
+	}
+
+	view := data.Commits[0]
+	if view.URL != "" {
+		t.Errorf("commit url should be empty without a GitHub base URL, got %q", view.URL)
+	}
+
+	if view.FormattedTopic != "fix: a bug (#42)" {
+		t.Errorf("PR reference should be left as written, got %q", view.FormattedTopic)
+	}
+}
+
 // issueInGroups reports whether any group holds an issue with the given key.
 func issueInGroups(groups []notes.StatusGroup, key string) bool {
 	for _, group := range groups {

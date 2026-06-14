@@ -164,10 +164,21 @@ func baseCommitView(coords Coordinates, c commit.Commit) CommitView {
 
 	return CommitView{
 		Hash:           c.Hash,
-		URL:            fmt.Sprintf("%s/commit/%s", coords.GithubBaseURL, c.CanonicalHash),
+		URL:            commitURL(coords.GithubBaseURL, c.CanonicalHash),
 		FormattedTopic: escapeTablePipes(topic),
 		Authors:        formatAuthors(c.Authors),
 	}
+}
+
+// commitURL builds the GitHub link to a commit, or "" when no GitHub base URL is
+// configured — the renderer then shows the hash as plain text rather than a
+// broken link.
+func commitURL(githubBaseURL, canonicalHash string) string {
+	if githubBaseURL == "" {
+		return ""
+	}
+
+	return fmt.Sprintf("%s/commit/%s", githubBaseURL, canonicalHash)
 }
 
 // escapeTablePipes escapes any "|" so a commit subject cannot break out of its
@@ -412,7 +423,13 @@ func formatAuthors(authors []string) string {
 var prReferencePattern = regexp.MustCompile(`\(#(\d+)\)`)
 
 // convertPRReferences turns "(#123)" into a Markdown link to the GitHub PR.
+// Without a GitHub base URL there is nowhere to link, so the reference is left
+// as written rather than turned into a broken relative link.
 func convertPRReferences(topic string, coords Coordinates) string {
+	if coords.GithubBaseURL == "" {
+		return topic
+	}
+
 	return prReferencePattern.ReplaceAllStringFunc(topic, func(match string) string {
 		number := prReferencePattern.FindStringSubmatch(match)[1]
 

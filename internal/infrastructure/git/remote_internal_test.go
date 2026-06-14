@@ -98,3 +98,38 @@ func TestParseRemoteURL(t *testing.T) {
 		})
 	}
 }
+
+func TestParseGithubSpec(t *testing.T) {
+	cases := []struct {
+		name    string
+		spec    string
+		baseURL string
+		wantOK  bool
+	}{
+		{name: "bare org/repo assumes github.com", spec: "acme/widgets", baseURL: "https://github.com/acme/widgets", wantOK: true},
+		{name: "bare with surrounding spaces", spec: "  acme/widgets  ", baseURL: "https://github.com/acme/widgets", wantOK: true},
+		{name: "https url", spec: "https://github.com/acme/widgets", baseURL: "https://github.com/acme/widgets", wantOK: true},
+		{name: "https url with .git", spec: "https://github.com/acme/widgets.git", baseURL: "https://github.com/acme/widgets", wantOK: true},
+		{name: "scp-like ssh shorthand", spec: "git@github.com:acme/widgets.git", baseURL: "https://github.com/acme/widgets", wantOK: true},
+		{name: "ssh url", spec: "ssh://git@github.com/acme/widgets.git", baseURL: "https://github.com/acme/widgets", wantOK: true},
+		{name: "non-github host is parsed (caller warns)", spec: "https://gitlab.com/group/widgets", baseURL: "https://gitlab.com/group/widgets", wantOK: true},
+		{name: "bare single segment is rejected", spec: "widgets", wantOK: false},
+		{name: "bare three segments is rejected", spec: "acme/widgets/extra", wantOK: false},
+		{name: "garbage is rejected", spec: "not a repo", wantOK: false},
+		{name: "empty is rejected", spec: "", wantOK: false},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			baseURL, ok := ParseGithubSpec(tc.spec)
+
+			if ok != tc.wantOK {
+				t.Fatalf("ok = %v, want %v", ok, tc.wantOK)
+			}
+
+			if tc.wantOK && baseURL != tc.baseURL {
+				t.Errorf("baseURL = %q, want %q", baseURL, tc.baseURL)
+			}
+		})
+	}
+}

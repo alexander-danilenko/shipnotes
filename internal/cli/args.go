@@ -26,6 +26,13 @@ type options struct {
 	// notes into the "Excluded commits" section. Empty (the default) excludes
 	// nothing.
 	excludeCommits string
+	// The following four override their environment-variable counterparts so the
+	// tool can run without a .env file. Each is "" when the flag was not given,
+	// which falls back to the environment (and, for githubRepo, the git remote).
+	jiraEmail   string
+	jiraToken   string
+	jiraBaseURL string
+	githubRepo  string
 	// showVersion is set by -v/--version; it makes the program print its
 	// version and exit, without requiring the commit_hash argument.
 	showVersion bool
@@ -47,6 +54,12 @@ func registerFlags(fs *flag.FlagSet, opts *options) {
 		"Case-insensitive regexp; issues whose status fully matches render as checked ([x]). Empty disables.")
 	fs.StringVar(&opts.excludeCommits, "exclude-commits", "",
 		"Case-insensitive regexp; commits whose subject matches are excluded from the notes. Empty keeps all.")
+	fs.StringVar(&opts.jiraEmail, "jira-email", "", "Jira account email (overrides SHIPNOTES_JIRA_EMAIL)")
+	fs.StringVar(&opts.jiraToken, "jira-token", "", "Jira read API token (overrides SHIPNOTES_JIRA_TOKEN)")
+	fs.StringVar(&opts.jiraBaseURL, "jira-base-url", "", "Jira site base URL (overrides SHIPNOTES_JIRA_BASE_URL)")
+	fs.StringVar(&opts.githubRepo, "github-repo", "",
+		"GitHub repo as a URL, SSH remote, or \"org/repo\" "+
+			"(overrides SHIPNOTES_GITHUB_REPO; inferred from the git remote when unset)")
 	fs.BoolVar(&opts.showVersion, "v", false, "Show the version and exit")
 	fs.BoolVar(&opts.showVersion, "version", false, "Show the version and exit")
 
@@ -102,22 +115,32 @@ Options:
                       The subject carries the Jira key, so you can also exclude by
                       ticket; anchor it ('\bCX-42\b') to avoid also matching
                       CX-420. Empty (the default) keeps every commit.
+  --jira-email EMAIL  Jira account email. Overrides SHIPNOTES_JIRA_EMAIL.
+  --jira-token TOKEN  Jira read-scoped API token. Overrides SHIPNOTES_JIRA_TOKEN.
+  --jira-base-url URL Jira site base URL. Overrides SHIPNOTES_JIRA_BASE_URL.
+  --github-repo REPO  GitHub repository, as a URL ("https://github.com/org/repo"),
+                      an SSH remote ("git@github.com:org/repo.git"), or the
+                      "org/repo" shorthand (assumed to be on github.com).
+                      Overrides SHIPNOTES_GITHUB_REPO; when unset it is inferred
+                      from the repository's git remote. It is optional: if none
+                      resolves, the notes are still written with commit and PR
+                      links omitted.
   -v, --version       Show the version and exit.
   -h, --help          Show this help and exit.
 
 Configuration:
-  Provide these as environment variables or in a .env file; real environment
-  variables take precedence over the file.
+  Each value can be given as a flag (above) or an environment variable; a flag
+  wins over the environment, and a real environment variable wins over a .env
+  file (loaded from the nearest .env or --env-file).
 
-  Required:
-    SHIPNOTES_JIRA_BASE_URL  e.g. https://acme.atlassian.net
-    SHIPNOTES_JIRA_EMAIL     Jira account email (used for Basic auth)
-    SHIPNOTES_JIRA_TOKEN     Jira read-scoped API token
+  Required (flag or environment variable):
+    --jira-base-url  / SHIPNOTES_JIRA_BASE_URL  e.g. https://acme.atlassian.net
+    --jira-email     / SHIPNOTES_JIRA_EMAIL     Jira account email (Basic auth)
+    --jira-token     / SHIPNOTES_JIRA_TOKEN     Jira read-scoped API token
 
-  Inferred from the repository's git remote when unset (set to override):
-    SHIPNOTES_REPO_ORG       GitHub organization
-    SHIPNOTES_REPO_NAME      GitHub repository name
-    SHIPNOTES_GITHUB_URL     e.g. https://github.com/acme/widgets
+  Optional (inferred from the git remote when unset):
+    --github-repo    / SHIPNOTES_GITHUB_REPO    e.g. https://github.com/acme/widgets
+                                                or the "acme/widgets" shorthand
 
 Examples:
   # Last 20 commits; summarizes every issue found in the range:
@@ -144,6 +167,10 @@ Examples:
 
   # With an explicit repository directory and .env file:
   shipnotes HEAD~5 --repo-dir /path/to/repo --env-file /path/to/.env
+
+  # Provide all configuration inline, without a .env file:
+  shipnotes HEAD~20 --jira-base-url https://acme.atlassian.net \
+    --jira-email me@acme.com --jira-token "$JIRA_TOKEN" --github-repo acme/widgets
 `
 
 // parseArgs reads the flags and the required positional commit hash. Flags may

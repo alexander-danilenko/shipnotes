@@ -1,12 +1,16 @@
-// Package config loads and validates the environment variables the tool needs.
-// It is an infrastructure adapter: it reaches out to the process environment and
-// a .env file and produces a validated Settings value the rest of the program
-// consumes.
+// Package config loads and validates the configuration the tool needs. It is an
+// infrastructure adapter: it reaches out to the process environment and a .env
+// file and produces a validated Settings value the rest of the program consumes.
 //
 // The flow is: load a .env file if present (without overriding variables that
-// are already set), then check that every required value exists and looks
-// valid. If anything is wrong we report every problem at once, so the user can
-// fix them in a single pass.
+// are already set), then check that every required value exists and looks valid,
+// taking a command-line flag in preference to the environment. If anything is
+// wrong we report every problem at once, so the user can fix them in a single
+// pass.
+//
+// The GitHub base URL is the one value config does not resolve here: it is
+// optional and needs git-remote parsing plus user-facing warnings, so the cli
+// layer resolves it (see EnvGithubRepo) and passes the result to Load.
 package config
 
 import (
@@ -20,32 +24,30 @@ import (
 
 // Settings holds the validated configuration used throughout the program.
 type Settings struct {
-	GitRepoOrganization string
-	GitRepoName         string
-	JiraBaseURL         string
-	GithubBaseURL       string
-	JiraEmail           string
-	JiraReadAPIToken    string
+	JiraBaseURL      string
+	GithubBaseURL    string
+	JiraEmail        string
+	JiraReadAPIToken string
 }
 
-// Defaults supplies fallback values for the repository-coordinate variables,
-// typically inferred from the git remote (see the git adapter's
-// InferRemoteDefaults). A blank field means "no default": the corresponding
-// environment variable is then required. An environment variable, when set,
-// always wins over a default.
-type Defaults struct {
-	GitRepoOrganization string
-	GitRepoName         string
-	GithubBaseURL       string
+// Overrides carries command-line flag values that take precedence over the
+// environment. A blank field means "no override": the environment value (or, for
+// these required variables, a validation error) applies instead.
+type Overrides struct {
+	JiraBaseURL string
+	JiraEmail   string
+	JiraToken   string
 }
+
+// EnvGithubRepo names the variable that supplies the GitHub repository. Unlike
+// the others it is read by the cli's GitHub resolver, not by Load, because
+// resolving it needs git-remote parsing and produces warnings.
+const EnvGithubRepo = "SHIPNOTES_GITHUB_REPO"
 
 // Environment variable names. Keeping them as constants avoids typos and makes
 // the .env.example file easy to keep in sync.
 const (
-	envRepoOrg     = "SHIPNOTES_REPO_ORG"
-	envRepoName    = "SHIPNOTES_REPO_NAME"
 	envJiraBaseURL = "SHIPNOTES_JIRA_BASE_URL"
-	envGithubURL   = "SHIPNOTES_GITHUB_URL"
 	envJiraEmail   = "SHIPNOTES_JIRA_EMAIL"
 	envJiraToken   = "SHIPNOTES_JIRA_TOKEN" //nolint:gosec // env var name, not a hardcoded credential
 )
@@ -71,80 +73,70 @@ func (e *ValidationError) Error() string {
 	return "environment validation failed: " + strings.Join(parts, "; ")
 }
 
-// Load reads the .env file (if found near the current directory), then reads
-// and validates the environment. Real environment variables always win over
-// values in the .env file.
+// LoadDotEnv copies a .env file's variables into the process environment so the
+// subsequent reads — both here and in the cli's GitHub resolver — see them. Real
+// environment variables are never overwritten.
 //
 // envFilePath, when non-empty, is the explicit --env-file to load instead of
 // searching for the nearest .env; a problem reading it is returned as an error.
-//
-// defaults provides fallbacks for the repository-coordinate variables (org,
-// repo name, GitHub base URL) so they can be omitted when they are inferable
-// from the git remote. The Jira variables have no defaults and stay required.
-func Load(envFilePath string, defaults Defaults) (Settings, error) {
-	if err := loadDotEnvFile(envFilePath); err != nil {
-		return Settings{}, err
-	}
+// Call this once, before Load and before resolving the GitHub repository.
+func LoadDotEnv(envFilePath string) error {
+	return loadDotEnvFile(envFilePath)
+}
 
+// Load reads and validates the Jira configuration, taking a command-line flag
+// (overrides) in preference to the environment, and records the already-resolved
+// GitHub base URL as-is.
+//
+// githubBaseURL is resolved by the caller (the cli's GitHub resolver) because it
+// is optional and needs git-remote parsing plus warnings; an empty value is
+// allowed and simply omits GitHub links from the notes.
+//
+// Call LoadDotEnv first so the environment reads include any .env values.
+func Load(overrides Overrides, githubBaseURL string) (Settings, error) {
 	var problems []FieldProblem
 
-	organization := requireNonEmpty(
-		envRepoOrg, defaults.GitRepoOrganization, "Git organization is required", &problems,
-	)
-	repoName := requireNonEmpty(
-		envRepoName, defaults.GitRepoName, "Git repository name is required", &problems,
-	)
-	jiraBaseURL := requireURL(envJiraBaseURL, "", &problems)
-	githubBaseURL := requireURL(envGithubURL, defaults.GithubBaseURL, &problems)
-	jiraEmail := requireEmail(envJiraEmail, &problems)
-	jiraToken := requireNonEmpty(envJiraToken, "", "JIRA read API token is required", &problems)
+	jiraBaseURL := requireURL(overrides.JiraBaseURL, envJiraBaseURL, &problems)
+	jiraEmail := requireEmail(overrides.JiraEmail, envJiraEmail, &problems)
+	jiraToken := requireNonEmpty(overrides.JiraToken, envJiraToken, "JIRA read API token is required", &problems)
 
 	if len(problems) > 0 {
 		return Settings{}, &ValidationError{Problems: problems}
 	}
 
 	return Settings{
-		GitRepoOrganization: organization,
-		GitRepoName:         repoName,
-		JiraBaseURL:         jiraBaseURL,
-		GithubBaseURL:       githubBaseURL,
-		JiraEmail:           jiraEmail,
-		JiraReadAPIToken:    jiraToken,
+		JiraBaseURL:      jiraBaseURL,
+		GithubBaseURL:    githubBaseURL,
+		JiraEmail:        jiraEmail,
+		JiraReadAPIToken: jiraToken,
 	}, nil
 }
 
-// requireNonEmpty returns the trimmed environment value, or fallback when the
-// environment variable is unset/blank. It records a problem if both are empty.
-func requireNonEmpty(name, fallback, message string, problems *[]FieldProblem) string {
-	value := strings.TrimSpace(os.Getenv(name))
+// requireNonEmpty returns the trimmed flag override, or the environment value
+// when no override was given. It records a problem (against the environment
+// variable name) if both are empty.
+func requireNonEmpty(override, envName, message string, problems *[]FieldProblem) string {
+	value := resolve(override, envName)
 	if value == "" {
-		value = strings.TrimSpace(fallback)
-	}
-
-	if value == "" {
-		*problems = append(*problems, FieldProblem{Field: name, Message: message})
+		*problems = append(*problems, FieldProblem{Field: envName, Message: message})
 	}
 
 	return value
 }
 
 // requireURL validates that the value is an absolute http(s) URL, taking the
-// environment value when set and otherwise the fallback.
-func requireURL(name, fallback string, problems *[]FieldProblem) string {
-	value := strings.TrimSpace(os.Getenv(name))
+// flag override when set and otherwise the environment value.
+func requireURL(override, envName string, problems *[]FieldProblem) string {
+	value := resolve(override, envName)
 	if value == "" {
-		value = strings.TrimSpace(fallback)
-	}
-
-	if value == "" {
-		*problems = append(*problems, FieldProblem{Field: name, Message: "Must be a valid URL"})
+		*problems = append(*problems, FieldProblem{Field: envName, Message: "Must be a valid URL"})
 
 		return ""
 	}
 
 	parsed, err := url.Parse(value)
 	if err != nil || parsed.Scheme == "" || parsed.Host == "" {
-		*problems = append(*problems, FieldProblem{Field: name, Message: "Must be a valid URL"})
+		*problems = append(*problems, FieldProblem{Field: envName, Message: "Must be a valid URL"})
 
 		return value
 	}
@@ -152,23 +144,34 @@ func requireURL(name, fallback string, problems *[]FieldProblem) string {
 	return value
 }
 
-// requireEmail validates that the value is a single email address.
-func requireEmail(name string, problems *[]FieldProblem) string {
-	value := strings.TrimSpace(os.Getenv(name))
+// requireEmail validates that the value is a single email address, taking the
+// flag override when set and otherwise the environment value.
+func requireEmail(override, envName string, problems *[]FieldProblem) string {
+	value := resolve(override, envName)
 	if value == "" {
-		*problems = append(*problems, FieldProblem{Field: name, Message: "Must be a valid email address"})
+		*problems = append(*problems, FieldProblem{Field: envName, Message: "Must be a valid email address"})
 
 		return ""
 	}
 
 	address, err := mail.ParseAddress(value)
 	if err != nil || address.Address != value {
-		*problems = append(*problems, FieldProblem{Field: name, Message: "Must be a valid email address"})
+		*problems = append(*problems, FieldProblem{Field: envName, Message: "Must be a valid email address"})
 
 		return value
 	}
 
 	return value
+}
+
+// resolve returns the trimmed flag override, falling back to the trimmed
+// environment variable when no override was given.
+func resolve(override, envName string) string {
+	if value := strings.TrimSpace(override); value != "" {
+		return value
+	}
+
+	return strings.TrimSpace(os.Getenv(envName))
 }
 
 // AsValidationError unwraps err into a *ValidationError when possible, so the

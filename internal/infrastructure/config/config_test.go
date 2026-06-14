@@ -8,14 +8,14 @@ import (
 	"github.com/alexander-danilenko/shipnotes/internal/infrastructure/config"
 )
 
-// configVarNames lists every environment variable the loader reads.
+// configVarNames lists every environment variable that affects the loader: the
+// three Jira variables it validates plus the GitHub repo (resolved elsewhere,
+// but cleared here so a stray value cannot leak into a test).
 var configVarNames = []string{
-	"SHIPNOTES_REPO_ORG",
-	"SHIPNOTES_REPO_NAME",
 	"SHIPNOTES_JIRA_BASE_URL",
-	"SHIPNOTES_GITHUB_URL",
 	"SHIPNOTES_JIRA_EMAIL",
 	"SHIPNOTES_JIRA_TOKEN",
+	config.EnvGithubRepo,
 }
 
 // clearConfigEnv unsets every config variable for the duration of a test (and
@@ -36,41 +36,37 @@ func clearConfigEnv(t *testing.T) {
 	}
 }
 
-// setValidEnv sets every required variable to a valid value.
-func setValidEnv(t *testing.T) {
+// setValidJiraEnv sets every required Jira variable to a valid value.
+func setValidJiraEnv(t *testing.T) {
 	t.Helper()
-	t.Setenv("SHIPNOTES_REPO_ORG", "acme")
-	t.Setenv("SHIPNOTES_REPO_NAME", "widgets")
 	t.Setenv("SHIPNOTES_JIRA_BASE_URL", "https://acme.atlassian.net")
-	t.Setenv("SHIPNOTES_GITHUB_URL", "https://github.com/acme/widgets")
 	t.Setenv("SHIPNOTES_JIRA_EMAIL", "ci@acme.com")
 	t.Setenv("SHIPNOTES_JIRA_TOKEN", "secret-token")
 }
 
 func TestLoadValid(t *testing.T) {
-	setValidEnv(t)
+	clearConfigEnv(t)
+	setValidJiraEnv(t)
 
-	settings, err := config.Load("", config.Defaults{})
+	settings, err := config.Load(config.Overrides{}, "https://github.com/acme/widgets")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if settings.GitRepoOrganization != "acme" || settings.JiraEmail != "ci@acme.com" {
+	if settings.JiraEmail != "ci@acme.com" || settings.GithubBaseURL != "https://github.com/acme/widgets" {
 		t.Errorf("unexpected settings: %+v", settings)
 	}
 }
 
 func TestLoadReportsEveryProblem(t *testing.T) {
-	// Override each variable with an invalid value so the result does not depend
-	// on whatever is (or isn't) in the real environment or a .env file.
-	t.Setenv("SHIPNOTES_REPO_ORG", "")
-	t.Setenv("SHIPNOTES_REPO_NAME", "")
+	// Override each Jira variable with an invalid value so the result does not
+	// depend on whatever is (or isn't) in the real environment or a .env file.
 	t.Setenv("SHIPNOTES_JIRA_BASE_URL", "not-a-url")
-	t.Setenv("SHIPNOTES_GITHUB_URL", "also-not-a-url")
 	t.Setenv("SHIPNOTES_JIRA_EMAIL", "not-an-email")
 	t.Setenv("SHIPNOTES_JIRA_TOKEN", "")
 
-	_, err := config.Load("", config.Defaults{})
+	// An empty GitHub URL is allowed (it is optional), so it adds no problem.
+	_, err := config.Load(config.Overrides{}, "")
 	if err == nil {
 		t.Fatal("expected a validation error")
 	}
@@ -80,18 +76,18 @@ func TestLoadReportsEveryProblem(t *testing.T) {
 		t.Fatalf("expected a *ValidationError, got %T", err)
 	}
 
-	if len(validationErr.Problems) != 6 {
-		t.Errorf("expected 6 problems, got %d: %v", len(validationErr.Problems), validationErr.Problems)
+	if len(validationErr.Problems) != 3 {
+		t.Errorf("expected 3 problems, got %d: %v", len(validationErr.Problems), validationErr.Problems)
 	}
 
-	// The reported field names must be the new SHIPNOTES_* names, so the
-	// user-facing error points at the variables the loader actually reads.
+	// The reported field names must be the Jira variable names, so the
+	// user-facing error points at the variables the loader actually validates.
 	reported := make(map[string]bool, len(validationErr.Problems))
 	for _, problem := range validationErr.Problems {
 		reported[problem.Field] = true
 	}
 
-	for _, name := range configVarNames {
+	for _, name := range []string{"SHIPNOTES_JIRA_BASE_URL", "SHIPNOTES_JIRA_EMAIL", "SHIPNOTES_JIRA_TOKEN"} {
 		if !reported[name] {
 			t.Errorf("expected a problem reported for %q, got fields %v", name, reported)
 		}
@@ -99,68 +95,86 @@ func TestLoadReportsEveryProblem(t *testing.T) {
 }
 
 func TestLoadAcceptsURLWithPath(t *testing.T) {
-	setValidEnv(t)
+	clearConfigEnv(t)
+	setValidJiraEnv(t)
 	t.Setenv("SHIPNOTES_JIRA_BASE_URL", "https://acme.atlassian.net/jira")
 
-	if _, err := config.Load("", config.Defaults{}); err != nil {
+	if _, err := config.Load(config.Overrides{}, ""); err != nil {
 		t.Errorf("URL with a path should be valid: %v", err)
 	}
 }
 
-func TestLoadUsesDefaultsWhenEnvMissing(t *testing.T) {
-	// The three repository-coordinate variables are blank, so the inferred
-	// defaults must be used. The Jira variables remain required.
-	t.Setenv("SHIPNOTES_REPO_ORG", "")
-	t.Setenv("SHIPNOTES_REPO_NAME", "")
-	t.Setenv("SHIPNOTES_GITHUB_URL", "")
-	t.Setenv("SHIPNOTES_JIRA_BASE_URL", "https://acme.atlassian.net")
-	t.Setenv("SHIPNOTES_JIRA_EMAIL", "ci@acme.com")
-	t.Setenv("SHIPNOTES_JIRA_TOKEN", "secret-token")
+func TestFlagOverridesEnv(t *testing.T) {
+	// Every Jira variable is set in the environment; the flag overrides must win.
+	setValidJiraEnv(t)
 
-	settings, err := config.Load("", config.Defaults{
-		GitRepoOrganization: "acme",
-		GitRepoName:         "widgets",
-		GithubBaseURL:       "https://github.com/acme/widgets",
-	})
+	settings, err := config.Load(config.Overrides{
+		JiraBaseURL: "https://flag.atlassian.net",
+		JiraEmail:   "flag@acme.com",
+		JiraToken:   "flag-token",
+	}, "")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if settings.GitRepoOrganization != "acme" || settings.GitRepoName != "widgets" {
-		t.Errorf("expected inferred org/repo, got %+v", settings)
-	}
-
-	if settings.GithubBaseURL != "https://github.com/acme/widgets" {
-		t.Errorf("expected inferred GitHub base URL, got %q", settings.GithubBaseURL)
+	if settings.JiraBaseURL != "https://flag.atlassian.net" ||
+		settings.JiraEmail != "flag@acme.com" ||
+		settings.JiraReadAPIToken != "flag-token" {
+		t.Errorf("flag overrides should win over the environment, got %+v", settings)
 	}
 }
 
-func TestLoadEnvOverridesDefaults(t *testing.T) {
-	// Every variable is set in the environment; the defaults must be ignored.
-	setValidEnv(t)
-
-	settings, err := config.Load("", config.Defaults{
-		GitRepoOrganization: "other",
-		GitRepoName:         "thing",
-		GithubBaseURL:       "https://github.com/other/thing",
-	})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	if settings.GithubBaseURL != "https://github.com/acme/widgets" {
-		t.Errorf("environment should win over defaults, got %q", settings.GithubBaseURL)
-	}
-}
-
-func TestLoadReadsExplicitEnvFile(t *testing.T) {
+func TestFlagSuppliesMissingValue(t *testing.T) {
+	// Nothing in the environment: the flags alone must satisfy validation, so the
+	// tool can run without a .env file.
 	clearConfigEnv(t)
 
+	settings, err := config.Load(config.Overrides{
+		JiraBaseURL: "https://acme.atlassian.net",
+		JiraEmail:   "ci@acme.com",
+		JiraToken:   "secret-token",
+	}, "")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if settings.JiraEmail != "ci@acme.com" {
+		t.Errorf("flags should supply missing config, got %+v", settings)
+	}
+}
+
+func TestLoadStoresGithubBaseURLVerbatim(t *testing.T) {
+	clearConfigEnv(t)
+	setValidJiraEnv(t)
+
+	settings, err := config.Load(config.Overrides{}, "https://example.com/org/repo")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if settings.GithubBaseURL != "https://example.com/org/repo" {
+		t.Errorf("GitHub base URL should be stored verbatim, got %q", settings.GithubBaseURL)
+	}
+
+	// An empty GitHub base URL is allowed: the repo is optional.
+	if _, err := config.Load(config.Overrides{}, ""); err != nil {
+		t.Errorf("an empty GitHub base URL should be allowed, got %v", err)
+	}
+}
+
+func TestLoadDotEnvReadsExplicitFile(t *testing.T) {
+	clearConfigEnv(t)
+
+	// LoadDotEnv writes into the real environment via os.Setenv, which t.Setenv
+	// cannot restore, so unset the variables again when the test finishes.
+	t.Cleanup(func() {
+		for _, name := range configVarNames {
+			_ = os.Unsetenv(name)
+		}
+	})
+
 	path := filepath.Join(t.TempDir(), "custom.env")
-	content := "SHIPNOTES_REPO_ORG=acme\n" +
-		"SHIPNOTES_REPO_NAME=widgets\n" +
-		"SHIPNOTES_JIRA_BASE_URL=https://acme.atlassian.net\n" +
-		"SHIPNOTES_GITHUB_URL=https://github.com/acme/widgets\n" +
+	content := "SHIPNOTES_JIRA_BASE_URL=https://acme.atlassian.net\n" +
 		"SHIPNOTES_JIRA_EMAIL=ci@acme.com\n" +
 		"SHIPNOTES_JIRA_TOKEN=secret-token\n"
 
@@ -168,20 +182,24 @@ func TestLoadReadsExplicitEnvFile(t *testing.T) {
 		t.Fatalf("writing temp env file: %v", err)
 	}
 
-	settings, err := config.Load(path, config.Defaults{})
+	if err := config.LoadDotEnv(path); err != nil {
+		t.Fatalf("unexpected error loading env file: %v", err)
+	}
+
+	settings, err := config.Load(config.Overrides{}, "")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if settings.GitRepoName != "widgets" || settings.JiraEmail != "ci@acme.com" {
+	if settings.JiraEmail != "ci@acme.com" {
 		t.Errorf("values were not loaded from --env-file: %+v", settings)
 	}
 }
 
-func TestLoadExplicitEnvFileMissingIsError(t *testing.T) {
+func TestLoadDotEnvMissingExplicitFileIsError(t *testing.T) {
 	missing := filepath.Join(t.TempDir(), "does-not-exist.env")
 
-	if _, err := config.Load(missing, config.Defaults{}); err == nil {
+	if err := config.LoadDotEnv(missing); err == nil {
 		t.Fatal("expected an error when --env-file points at a missing file")
 	}
 }

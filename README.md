@@ -1,4 +1,8 @@
-# shipnotes
+<p align="center">
+  <img src="docs/assets/logo.svg" alt="shipnotes" width="120">
+</p>
+
+<h1 align="center">shipnotes</h1>
 
 > *Ship notes, not sh\*t notes* — one well-formed Markdown file beats a wall of raw `git log`.
 
@@ -59,22 +63,20 @@ go run . <commit_hash> [options]
    shipnotes HEAD~20
    ```
 
-   This writes `SHIPNOTES.md` in the repository root. `shipnotes` infers the repository org, name, and GitHub URL from your `origin` remote.
+   This writes `SHIPNOTES.md` in the repository root. `shipnotes` infers the GitHub repository from your `origin` remote.
 
 ## Configuration
 
-`shipnotes` reads six variables. Set them as environment variables or in a `.env` file (see [`.env.example`](.env.example)). Environment variables always take precedence over the file.
+`shipnotes` needs four values. Provide each one as a command-line flag or an environment variable (set directly or in a `.env` file — see [`.env.example`](.env.example)). A flag wins over the environment, and a real environment variable wins over the `.env` file.
 
-| Required? | Variable | Meaning |
-|-----------|----------|---------|
-| **Yes** | `SHIPNOTES_JIRA_BASE_URL` | Jira base URL, e.g. `https://acme.atlassian.net` |
-| **Yes** | `SHIPNOTES_JIRA_EMAIL` | Jira account email (Basic auth) |
-| **Yes** | `SHIPNOTES_JIRA_TOKEN` | Jira read-scoped API token |
-| Inferred¹ | `SHIPNOTES_REPO_ORG` | GitHub organization name |
-| Inferred¹ | `SHIPNOTES_REPO_NAME` | GitHub repository name |
-| Inferred¹ | `SHIPNOTES_GITHUB_URL` | Repo base URL, e.g. `https://github.com/acme/widgets` |
+| Required? | Flag | Environment variable | Meaning |
+|-----------|------|----------------------|---------|
+| **Yes** | `--jira-base-url` | `SHIPNOTES_JIRA_BASE_URL` | Jira base URL, e.g. `https://acme.atlassian.net` |
+| **Yes** | `--jira-email` | `SHIPNOTES_JIRA_EMAIL` | Jira account email (Basic auth) |
+| **Yes** | `--jira-token` | `SHIPNOTES_JIRA_TOKEN` | Jira read-scoped API token |
+| Inferred¹ | `--github-repo` | `SHIPNOTES_GITHUB_REPO` | GitHub repository: a URL, an SSH remote, or the `org/repo` shorthand |
 
-¹ When unset, `shipnotes` infers these from the git remote (`origin`, then `upstream`). It resolves a custom SSH host alias (such as `git@github-work:org/repo.git` from `~/.ssh/config`) to its real hostname with `ssh -G`. Any variable you set explicitly overrides the inferred value.
+¹ When unset, `shipnotes` infers the GitHub repository from the git remote (`origin`, then `upstream`). It resolves a custom SSH host alias (such as `git@github-work:org/repo.git` from `~/.ssh/config`) to its real hostname with `ssh -G`. A flag or environment variable you set explicitly overrides the inferred value. The GitHub repository is optional: if none can be determined, `shipnotes` warns and still writes the notes, omitting the commit and pull-request links. It also warns when the repository is not on `github.com`, since the links use GitHub's URL format.
 
 ### Where the `.env` file is loaded from
 
@@ -99,6 +101,10 @@ shipnotes <commit_hash> [options]
 | `--jql "QUERY"` | *summarize all* | JQL query whose matching issues become the expected release list (the "Release summary" section). |
 | `--checked-statuses REGEXP` | `done\|ready to release\|ready for release` | Case-insensitive regexp matched against each issue's full status; matching issues render as completed (`[x]`) in the summary. Pass `""` to disable. |
 | `--exclude-commits REGEXP` | *empty* | Case-insensitive (unanchored) regexp matched against each commit's subject; matching commits are dropped from the notes into an "Excluded commits" section. Empty keeps every commit. |
+| `--jira-base-url URL` | from env | Jira base URL. Overrides `SHIPNOTES_JIRA_BASE_URL`. |
+| `--jira-email EMAIL` | from env | Jira account email. Overrides `SHIPNOTES_JIRA_EMAIL`. |
+| `--jira-token TOKEN` | from env | Jira read-scoped API token. Overrides `SHIPNOTES_JIRA_TOKEN`. |
+| `--github-repo REPO` | inferred | GitHub repo as a URL, SSH remote, or `org/repo`. Overrides `SHIPNOTES_GITHUB_REPO`; inferred from the git remote when unset. |
 | `-v`, `--version` | | Show the version and exit. |
 | `-h`, `--help` | | Show full help and exit. |
 
