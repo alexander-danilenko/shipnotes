@@ -1,9 +1,11 @@
 # Local environment file (never commit secrets).
 .env
 
-# AI Workflow internal docs.
-docs/
+# Session scratch buffer (machine-local; docs/ is tracked).
 .remember/
+
+# Machine-local Compound Engineering settings (the .example.yaml is tracked).
+.compound-engineering/*.local.yaml
 
 # GoReleaser build output (local `goreleaser build/release` runs).
 dist/

@@ -120,6 +120,7 @@ shipnotes <commit_hash> [options]
 - **`--jql "QUERY"`** — JQL query whose matching issues become the expected release list (the "Release summary" section). When omitted, every issue found in the range is summarized.
 - **`--checked-statuses REGEXP`** — Case-insensitive regexp matched against each issue's full status; matching issues render as completed (`[x]`) in the summary. Pass `""` to disable (default: `done|ready to release|ready for release`).
 - **`--exclude-commits REGEXP`** — Case-insensitive (unanchored) regexp matched against each commit's subject; matching commits are dropped from the notes into an "Excluded commits" section. Empty keeps every commit (default: empty).
+- **`--shipped-ref REF`** — Branch or tag holding already-released work, e.g. `origin/main`. Issues whose commits that branch cherry-picked move to an "Already shipped" section (default: the repository's default branch).
 - **`--jira-base-url URL`** — Jira base URL. Overrides `SHIPNOTES_JIRA_BASE_URL` (default: from env).
 - **`--jira-email EMAIL`** — Jira account email. Overrides `SHIPNOTES_JIRA_EMAIL` (default: from env).
 - **`--jira-token TOKEN`** — Jira read-scoped API token. Overrides `SHIPNOTES_JIRA_TOKEN` (default: from env).
@@ -200,6 +201,16 @@ The match is anchored to the whole status, so `done` matches `Done` but not `Alm
 One pattern can drop commits by type, such as `^(chore|docs|test|ci|build)(\(|:)`. The subject also carries the Jira key, so you can exclude by ticket. Because the match is unanchored, use word boundaries for one exact ticket: `\bPROJ-42\b` matches `PROJ-42` but not `PROJ-420`.
 
 Matching commits leave the commit-history table and the Release summary. They aren't deleted — they move to an "Excluded commits" section, so the notes stay auditable. This section appears even when the range has no Jira issues at all. Exclusion is the first gate: a matched commit is reported only as excluded, even if it's also a revert or reapply. Pass an empty string (the default) to keep every commit.
+
+### Already shipped
+
+Some work ships ahead of the release it belongs to. A fix lands on `develop`, you cut a release branch off `master`, cherry-pick just that fix onto it, and merge it to `master`. Weeks later you generate notes for the `develop` range — and the fix is sitting in it, reading as new work, even though it went to production long ago.
+
+shipnotes recognizes it by reading the release branch. `git cherry-pick -x` records `(cherry picked from commit …)` on the **copy**, naming the original, so the evidence lives on `master`, not on the commit in your range. shipnotes scans that branch's history for those trailers: any commit in your range they name has already been released. If *every* commit for a ticket is one of those, the ticket moves to an "Already shipped" section instead of the release summary — a ticket that also has new work in the range stays where it is.
+
+The commits themselves stay in the commit-history table, so nothing disappears. A ticket you named explicitly with `--jql` stays in the release summary *and* appears under "Already shipped", so you can see that something you expected to ship has already gone out.
+
+`--shipped-ref` names the branch to read; it defaults to your repository's default branch, which is usually what you want. Two requirements: the cherry-picks must have been made with `-x` (git writes the trailer nowhere else), and the original commit must not have been rewritten since, or the recorded hash no longer matches. When neither holds, nothing is detected and the output is exactly as before.
 
 ## Development
 

@@ -83,6 +83,12 @@ type SummaryData struct {
 	// issue summary — a reapply re-ships the change — and are surfaced here only
 	// as a callout for reviewers.
 	Reapplied []CommitView `json:"reapplied"`
+	// AlreadyShipped: issues whose every commit in the range re-lands a change
+	// that was released before the range began, grouped by status like ByStatus.
+	// They are not part of this release, so they leave the summary lists — but
+	// they are listed here rather than dropped, so a reader can see what was held
+	// back and why. Their commits stay in the commit history table.
+	AlreadyShipped []StatusGroup `json:"alreadyShipped"`
 	// Excluded: commits dropped from the notes by the --exclude-commits filter.
 	// They are kept here, not deleted, so the notes remain auditable — a reviewer
 	// can see exactly what was filtered out and why nothing is hidden.
@@ -93,5 +99,6 @@ type SummaryData struct {
 // the builder can return nil and let the template omit the whole summary block.
 func (s *SummaryData) isEmpty() bool {
 	return len(s.ByStatus) == 0 && len(s.Missing) == 0 && len(s.Extra) == 0 &&
-		len(s.Reverted) == 0 && len(s.Reapplied) == 0 && len(s.Excluded) == 0
+		len(s.AlreadyShipped) == 0 && len(s.Reverted) == 0 && len(s.Reapplied) == 0 &&
+		len(s.Excluded) == 0
 }

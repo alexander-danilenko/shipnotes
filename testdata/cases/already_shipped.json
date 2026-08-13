@@ -1,0 +1,75 @@
+{
+  "header": {
+    "date": "2024-03-01T09:00",
+    "repository": "https://github.com/acme/widgets"
+  },
+  "summary": {
+    "byStatus": [
+      {
+        "status": "In Progress",
+        "issues": [
+          { "key": "PROJ-200", "url": "https://acme.atlassian.net/browse/PROJ-200", "title": "Rework the checkout flow", "checked": false }
+        ]
+      }
+    ],
+    "missing": null,
+    "extra": null,
+    "alreadyShipped": [
+      {
+        "status": "Done",
+        "issues": [
+          { "key": "PROJ-101", "url": "https://acme.atlassian.net/browse/PROJ-101", "title": "Add login page", "checked": true },
+          { "key": "PROJ-105", "url": "https://acme.atlassian.net/browse/PROJ-105", "title": "Fix the session timeout", "checked": true }
+        ]
+      },
+      {
+        "status": "Ready for Release",
+        "issues": [
+          { "key": "PROJ-103", "url": "https://acme.atlassian.net/browse/PROJ-103", "title": "Correct the invoice total", "checked": true }
+        ]
+      }
+    ],
+    "reverted": null,
+    "reapplied": null,
+    "excluded": null
+  },
+  "commits": [
+    {
+      "hash": "aaa1111",
+      "url": "https://github.com/acme/widgets/commit/aaa1111222333aaa1111222333aaa1111222333a",
+      "jiraIssueKey": "PROJ-200",
+      "jiraIssueUrl": "https://acme.atlassian.net/browse/PROJ-200",
+      "status": "In Progress",
+      "formattedTopic": "[PROJ-200](https://acme.atlassian.net/browse/PROJ-200): Rework the checkout flow",
+      "authors": "`Jane Doe`"
+    },
+    {
+      "hash": "bbb2222",
+      "url": "https://github.com/acme/widgets/commit/bbb2222333444bbb2222333444bbb2222333444b",
+      "jiraIssueKey": "PROJ-101",
+      "jiraIssueUrl": "https://acme.atlassian.net/browse/PROJ-101",
+      "status": "Done",
+      "formattedTopic": "[PROJ-101](https://acme.atlassian.net/browse/PROJ-101): Add login page",
+      "authors": "`alex`"
+    },
+    {
+      "hash": "ccc3333",
+      "url": "https://github.com/acme/widgets/commit/ccc3333444555ccc3333444555ccc3333444555c",
+      "jiraIssueKey": "PROJ-103",
+      "jiraIssueUrl": "https://acme.atlassian.net/browse/PROJ-103",
+      "status": "Ready for Release",
+      "formattedTopic": "[PROJ-103](https://acme.atlassian.net/browse/PROJ-103): Correct the invoice total",
+      "authors": "`alex`"
+    },
+    {
+      "hash": "ddd4444",
+      "url": "https://github.com/acme/widgets/commit/ddd4444555666ddd4444555666ddd4444555666d",
+      "jiraIssueKey": "PROJ-105",
+      "jiraIssueUrl": "https://acme.atlassian.net/browse/PROJ-105",
+      "status": "Done",
+      "formattedTopic": "[PROJ-105](https://acme.atlassian.net/browse/PROJ-105): Fix the session timeout",
+      "authors": "`Jane Doe`"
+    }
+  ],
+  "authors": ["alex", "Jane Doe"]
+}

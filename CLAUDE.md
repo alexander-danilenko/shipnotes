@@ -8,7 +8,7 @@ This file tells Claude Code (and any human) how to work in this project.
 
 It is a single, dependency-free binary that runs anywhere Go is installed, with no virtual environment or package install step — the only things it needs at runtime are the `git` command and network access to the Jira REST API.
 
-> **Workflow-agnostic by design.** The tool makes no assumptions about your Jira workflow. Grouping has no notion of which statuses mean "done" — issues are grouped by whatever status names they happen to have (sorted alphabetically), and each commit shows its issue's status text as-is. There are two opt-in opinions, each disabled by an empty pattern. `--checked-statuses` is a case-insensitive regexp whose matching statuses render as completed (`[x]`) checkboxes in the summary; it defaults to `done|ready to release|ready for release`. `--exclude-commits` is a case-insensitive (unanchored) regexp, matched against each commit's subject (which carries its Jira key), that drops matching commits from the notes into an "Excluded commits" section — relocated, not deleted, so the notes stay auditable; it is empty by default. The same algorithm works on any repo and any Jira setup, with zero configuration.
+> **Workflow-agnostic by design.** The tool makes no assumptions about your Jira workflow. Grouping has no notion of which statuses mean "done" — issues are grouped by whatever status names they happen to have (sorted alphabetically), and each commit shows its issue's status text as-is. There are two opt-in opinions, each disabled by an empty pattern. `--checked-statuses` is a case-insensitive regexp whose matching statuses render as completed (`[x]`) checkboxes in the summary; it defaults to `done|ready to release|ready for release`. `--exclude-commits` is a case-insensitive (unanchored) regexp, matched against each commit's subject (which carries its Jira key), that drops matching commits from the notes into an "Excluded commits" section — relocated, not deleted, so the notes stay auditable; it is empty by default. A third gate reports work that already went out, and it is evidence rather than opinion. Git writes the `cherry picked from commit …` trailer on the **copy**, naming the original, so a commit cherry-picked out to a release branch leaves its record *there*, not in the range being reported. shipnotes therefore scans `--shipped-ref` (default: the repository's default branch) for those trailers, and an issue whose every commit in the range is named by one moves to an "Already shipped" section — again relocated, not deleted. The flag says where to look, never what counts as shipped; a team that does not cherry-pick with `-x` sees no change at all. The gate order is exclude → revert → already-shipped. The same algorithm works on any repo and any Jira setup, with zero configuration.
 
 ## Keep ARCHITECTURE.md in sync (mandatory)
 
@@ -59,6 +59,7 @@ shipnotes <commit_hash> \
   --jql "key IN (PROJ-101, PROJ-102)" \  # optional JQL selecting the release issues for the summary
   --checked-statuses "done|qa" \     # regexp of statuses to render as [x] (default: done|ready to release|ready for release)
   --exclude-commits '^(chore|docs):' \ # regexp; matching commits move to "Excluded commits" (default: empty, keep all)
+  --shipped-ref origin/main \        # branch whose cherry-picks mark issues "Already shipped" (default: default branch)
   --jira-base-url https://acme.atlassian.net \ # overrides SHIPNOTES_JIRA_BASE_URL
   --jira-email me@acme.com \         # overrides SHIPNOTES_JIRA_EMAIL
   --jira-token "$JIRA_TOKEN" \       # overrides SHIPNOTES_JIRA_TOKEN
@@ -86,7 +87,7 @@ shipnotes/
 ├── main.go                          # Thin entry point: calls cli.Run.
 ├── internal/
 │   ├── domain/                       # THE CORE — entities + ports, no I/O.
-│   │   ├── commit/   commit.go       #   Commit entity + revert/reapply/key rules.
+│   │   ├── commit/   commit.go       #   Commit entity + revert/reapply/cherry-pick/key rules.
 │   │   │             repository.go   #   Port: read commits (Validate, Log).
 │   │   ├── issue/    issue.go        #   Issue entity.
 │   │   │             provider.go     #   Port: load issues by key.
@@ -97,7 +98,8 @@ shipnotes/
 │   ├── application/ app.go           # Use case: orchestrates the whole flow via
 │   │                                 #   ports (+ Writer and IssueSearcher ports).
 │   ├── infrastructure/               # ADAPTERS — implement the ports.
-│   │   ├── git/         repository.go #   Runs `git`; validates refs (commit.Repository).
+│   │   ├── git/         repository.go #   Runs `git`; validates refs; reads the release
+│   │   │                              #     branch's cherry-pick trailers (commit.Repository).
 │   │   │               parser.go     #     Raw `git log` text → commit.Commit values.
 │   │   │               remote.go     #     Infers/parses the GitHub base URL (remote or --github-repo).
 │   │   ├── jira/       client.go     #   Jira REST API → issue.Issue (issue.Provider + IssueSearcher).
@@ -110,7 +112,8 @@ shipnotes/
 │   │   ├── terminal/   terminal.go   #   Colored console output (report.Reporter).
 │   │   └── fileoutput/ writer.go     #   Writes the Markdown file (application.Writer).
 │   └── cli/         cli.go           # Interface layer + composition root.
-│                    args.go          #   Flag parsing, usage; --jql/--checked-statuses/--exclude-commits, --jira-*/--github-repo flags.
+│                    args.go          #   Flag parsing, usage; --jql/--checked-statuses/--exclude-commits/
+│                                     #     --shipped-ref, --jira-*/--github-repo flags.
 │                    repo.go          #   Resolves the repository directory.
 │                    errors.go        #   Prints config-validation problems.
 ├── testdata/                         # Test fixtures + golden output (see below).

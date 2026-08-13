@@ -1,0 +1,36 @@
+# Release Notes
+
+- **Generated:** 2024-03-01T09:00
+- **Repository:** https://github.com/acme/widgets
+
+## Release summary
+
+### In Progress
+
+- [ ] [PROJ-200](https://acme.atlassian.net/browse/PROJ-200) Rework the checkout flow
+
+
+
+
+## Already shipped
+
+**Done**
+- [x] [PROJ-101](https://acme.atlassian.net/browse/PROJ-101) Add login page
+- [x] [PROJ-105](https://acme.atlassian.net/browse/PROJ-105) Fix the session timeout
+
+**Ready for Release**
+- [x] [PROJ-103](https://acme.atlassian.net/browse/PROJ-103) Correct the invoice total
+
+## Participants
+
+- `alex`
+- `Jane Doe`
+
+## Commit history
+
+| Hash | Jira Key | Jira Status | Commit Message | Authors |
+|------|----------|-------------|----------------|---------|
+| [`aaa1111`](https://github.com/acme/widgets/commit/aaa1111222333aaa1111222333aaa1111222333a) | [PROJ-200](https://acme.atlassian.net/browse/PROJ-200) | In Progress | [PROJ-200](https://acme.atlassian.net/browse/PROJ-200): Rework the checkout flow | `Jane Doe` |
+| [`bbb2222`](https://github.com/acme/widgets/commit/bbb2222333444bbb2222333444bbb2222333444b) | [PROJ-101](https://acme.atlassian.net/browse/PROJ-101) | Done | [PROJ-101](https://acme.atlassian.net/browse/PROJ-101): Add login page | `alex` |
+| [`ccc3333`](https://github.com/acme/widgets/commit/ccc3333444555ccc3333444555ccc3333444555c) | [PROJ-103](https://acme.atlassian.net/browse/PROJ-103) | Ready for Release | [PROJ-103](https://acme.atlassian.net/browse/PROJ-103): Correct the invoice total | `alex` |
+| [`ddd4444`](https://github.com/acme/widgets/commit/ddd4444555666ddd4444555666ddd4444555666d) | [PROJ-105](https://acme.atlassian.net/browse/PROJ-105) | Done | [PROJ-105](https://acme.atlassian.net/browse/PROJ-105): Fix the session timeout | `Jane Doe` |

@@ -30,6 +30,16 @@
 {{ end }}
 {{ end }}{{ end -}}
 {{ end }}
+{{ if .Summary.AlreadyShipped -}}
+## Already shipped
+
+{{ range .Summary.AlreadyShipped }}{{ if .Issues -}}
+**{{ .Status }}**
+{{ range .Issues -}}
+- [{{ if .Checked }}x{{ else }} {{ end }}] [{{ .Key }}]({{ .URL }}) {{ .Title }}
+{{ end }}
+{{ end }}{{ end -}}
+{{ end -}}
 {{ if .Summary.Reverted -}}
 ## Reverted commits
 

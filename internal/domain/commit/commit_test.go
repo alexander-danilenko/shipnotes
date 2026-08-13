@@ -28,6 +28,62 @@ func TestExtractIssueIDs(t *testing.T) {
 	}
 }
 
+func TestExtractCherryPickSources(t *testing.T) {
+	const (
+		first  = "1234567890abcdef1234567890abcdef12345678"
+		second = "fedcba0987654321fedcba0987654321fedcba09"
+	)
+
+	tests := []struct {
+		name    string
+		message string
+		want    []string
+	}{
+		{name: "empty", message: "", want: []string{}},
+		{name: "no trailer", message: "PROJ-1: add feature\n\nJust a normal commit.", want: []string{}},
+		{
+			name:    "single trailer",
+			message: "PROJ-1: add feature\n\n(cherry picked from commit " + first + ")",
+			want:    []string{first},
+		},
+		{
+			name: "two trailers in first-seen order",
+			message: "PROJ-1: add feature\n\n(cherry picked from commit " + first + ")\n" +
+				"(cherry picked from commit " + second + ")",
+			want: []string{first, second},
+		},
+		{
+			name: "same hash twice yields one entry",
+			message: "PROJ-1: add feature\n\n(cherry picked from commit " + first + ")\n" +
+				"(cherry picked from commit " + first + ")",
+			want: []string{first},
+		},
+		{
+			name:    "indented trailer still matches",
+			message: "PROJ-1: add feature\n\n    (cherry picked from commit " + first + ")",
+			want:    []string{first},
+		},
+		// A hash shipnotes cannot vouch for must not reach the git command line,
+		// so anything that is not 7-40 lowercase hex characters yields nothing.
+		{name: "hash too short", message: "(cherry picked from commit abc123)", want: []string{}},
+		{name: "hash not hex", message: "(cherry picked from commit 123456z)", want: []string{}},
+		{name: "hash uppercase", message: "(cherry picked from commit ABCDEF1)", want: []string{}},
+		{
+			name:    "hash too long",
+			message: "(cherry picked from commit " + first + "9)",
+			want:    []string{},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := commit.ExtractCherryPickSources(tc.message); !reflect.DeepEqual(got, tc.want) {
+				t.Errorf("got %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
+
 func TestIsRevertTopic(t *testing.T) {
 	revert := []string{`Revert "PROJ-99: risky change"`, "revert: undo it", "  REVERT something"}
 	notRevert := []string{"PROJ-1: add feature", `Reapply "PROJ-99: risky change"`, ""}

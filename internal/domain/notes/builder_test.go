@@ -76,6 +76,188 @@ func TestBuildFallbackWarningOnlyWhenNoSelection(t *testing.T) {
 	}
 }
 
+// TestBuildMovesAlreadyShippedIssuesOutOfTheSummary covers the core case: a
+// ticket whose only commit in the range re-lands an already-released change
+// leaves the release summary, while the commit itself stays in the history
+// table and its author stays credited.
+func TestBuildMovesAlreadyShippedIssuesOutOfTheSummary(t *testing.T) {
+	commits := []commit.Commit{
+		{
+			CanonicalHash: "h1", Hash: "h1", Topic: "PROJ-101: re-landed fix",
+			JiraIssueIDs: []string{"PROJ-101"}, Authors: []string{"Jane"}, IsAlreadyShipped: true,
+		},
+		{CanonicalHash: "h2", Hash: "h2", Topic: "PROJ-200: new work", JiraIssueIDs: []string{"PROJ-200"}, Authors: []string{"alex"}},
+	}
+	builder := newBuilder([]issue.Issue{
+		issueWithStatus("PROJ-101", "Re-landed fix", "Done"),
+		issueWithStatus("PROJ-200", "New work", "In Progress"),
+	})
+
+	data, err := builder.Build(context.Background(), testCoords(), commits, nil)
+	if err != nil {
+		t.Fatalf("build: %v", err)
+	}
+
+	assertSingleIssue(t, data.Summary.AlreadyShipped, "Done", "PROJ-101")
+	assertSingleIssue(t, data.Summary.ByStatus, "In Progress", "PROJ-200")
+
+	if keys := groupedKeys(data.Summary.Extra); len(keys) != 0 {
+		t.Errorf("extra: got %v, want none", keys)
+	}
+
+	if len(data.Commits) != 2 {
+		t.Errorf("commit history: got %d rows, want 2 — an already-shipped commit still belongs in the table", len(data.Commits))
+	}
+
+	if len(data.Authors) != 2 {
+		t.Errorf("authors: got %v, want both credited", data.Authors)
+	}
+}
+
+// TestBuildKeepsTicketsThatAlsoCarryNewWork proves the all-commits rule: one
+// already-shipped cherry-pick does not retire a ticket that is still shipping
+// other work in the same range.
+func TestBuildKeepsTicketsThatAlsoCarryNewWork(t *testing.T) {
+	commits := []commit.Commit{
+		{
+			CanonicalHash: "h1", Hash: "h1", Topic: "PROJ-102: backport",
+			JiraIssueIDs: []string{"PROJ-102"}, Authors: []string{"Jane"}, IsAlreadyShipped: true,
+		},
+		{CanonicalHash: "h2", Hash: "h2", Topic: "PROJ-102: follow-up", JiraIssueIDs: []string{"PROJ-102"}, Authors: []string{"Jane"}},
+	}
+	builder := newBuilder([]issue.Issue{issueWithStatus("PROJ-102", "Spans two releases", "Done")})
+
+	data, err := builder.Build(context.Background(), testCoords(), commits, nil)
+	if err != nil {
+		t.Fatalf("build: %v", err)
+	}
+
+	if keys := groupedKeys(data.Summary.AlreadyShipped); len(keys) != 0 {
+		t.Errorf("already shipped: got %v, want none — the ticket still has new work in this range", keys)
+	}
+
+	assertSingleIssue(t, data.Summary.ByStatus, "Done", "PROJ-102")
+}
+
+// TestBuildShowsSelectedAlreadyShippedIssueInBothLists covers the --jql case: an
+// explicitly selected issue stays in the release summary and is additionally
+// called out, so the reader can see the discrepancy rather than have it
+// resolved for them. It must never fall through to "Missing".
+func TestBuildShowsSelectedAlreadyShippedIssueInBothLists(t *testing.T) {
+	commits := []commit.Commit{
+		{
+			CanonicalHash: "h1", Hash: "h1", Topic: "PROJ-103: re-landed fix",
+			JiraIssueIDs: []string{"PROJ-103"}, Authors: []string{"Jane"}, IsAlreadyShipped: true,
+		},
+	}
+	builder := newBuilder([]issue.Issue{issueWithStatus("PROJ-103", "Already out", "Done")})
+
+	data, err := builder.Build(context.Background(), testCoords(), commits, []string{"PROJ-103"})
+	if err != nil {
+		t.Fatalf("build: %v", err)
+	}
+
+	assertSingleIssue(t, data.Summary.ByStatus, "Done", "PROJ-103")
+	assertSingleIssue(t, data.Summary.AlreadyShipped, "Done", "PROJ-103")
+
+	if len(data.Summary.Missing) != 0 {
+		t.Errorf("missing: got %v, want none — the issue did appear in a commit", data.Summary.Missing)
+	}
+}
+
+// TestBuildKeepsAlreadyShippedOutOfExtra covers the second auto-discovery path:
+// a key found in commits but outside an explicit --jql selection normally lands
+// in "Extra", and must not when it already shipped.
+func TestBuildKeepsAlreadyShippedOutOfExtra(t *testing.T) {
+	commits := []commit.Commit{
+		{
+			CanonicalHash: "h1", Hash: "h1", Topic: "PROJ-104: re-landed fix",
+			JiraIssueIDs: []string{"PROJ-104"}, Authors: []string{"Jane"}, IsAlreadyShipped: true,
+		},
+		{CanonicalHash: "h2", Hash: "h2", Topic: "PROJ-105: new work", JiraIssueIDs: []string{"PROJ-105"}, Authors: []string{"alex"}},
+	}
+	builder := newBuilder([]issue.Issue{
+		issueWithStatus("PROJ-104", "Already out", "Done"),
+		issueWithStatus("PROJ-105", "New work", "Done"),
+	})
+
+	data, err := builder.Build(context.Background(), testCoords(), commits, []string{"PROJ-105"})
+	if err != nil {
+		t.Fatalf("build: %v", err)
+	}
+
+	if keys := groupedKeys(data.Summary.Extra); len(keys) != 0 {
+		t.Errorf("extra: got %v, want none", keys)
+	}
+
+	assertSingleIssue(t, data.Summary.AlreadyShipped, "Done", "PROJ-104")
+}
+
+// TestBuildEarlierGatesOutrankAlreadyShipped proves the precedence chain:
+// exclusion runs first, then reverts, and a commit caught by either is reported
+// there instead of under "Already shipped".
+func TestBuildEarlierGatesOutrankAlreadyShipped(t *testing.T) {
+	t.Run("excluded", func(t *testing.T) {
+		commits := []commit.Commit{
+			{
+				CanonicalHash: "h1", Hash: "h1", Topic: "chore: PROJ-106 tidy up",
+				JiraIssueIDs: []string{"PROJ-106"}, Authors: []string{"Jane"}, IsAlreadyShipped: true,
+			},
+		}
+		builder := newBuilderExcluding([]issue.Issue{issueWithStatus("PROJ-106", "Tidy", "Done")}, "^chore")
+
+		data, err := builder.Build(context.Background(), testCoords(), commits, nil)
+		if err != nil {
+			t.Fatalf("build: %v", err)
+		}
+
+		if len(data.Summary.Excluded) != 1 {
+			t.Fatalf("excluded: got %v, want one commit", data.Summary.Excluded)
+		}
+
+		if keys := groupedKeys(data.Summary.AlreadyShipped); len(keys) != 0 {
+			t.Errorf("already shipped: got %v, want none — exclusion is the first gate", keys)
+		}
+	})
+
+	t.Run("reverted", func(t *testing.T) {
+		commits := []commit.Commit{
+			{
+				CanonicalHash: "h1", Hash: "h1", Topic: `Revert "PROJ-107: oops"`,
+				JiraIssueIDs: []string{"PROJ-107"}, Authors: []string{"Jane"}, IsRevert: true, IsAlreadyShipped: true,
+			},
+		}
+		builder := newBuilder([]issue.Issue{issueWithStatus("PROJ-107", "Oops", "Done")})
+
+		data, err := builder.Build(context.Background(), testCoords(), commits, nil)
+		if err != nil {
+			t.Fatalf("build: %v", err)
+		}
+
+		if len(data.Summary.Reverted) != 1 {
+			t.Fatalf("reverted: got %v, want one commit", data.Summary.Reverted)
+		}
+
+		if keys := groupedKeys(data.Summary.AlreadyShipped); len(keys) != 0 {
+			t.Errorf("already shipped: got %v, want none — a revert already leaves the issue summary", keys)
+		}
+	})
+}
+
+// groupedKeys flattens the issue keys out of a list of status groups, so a test
+// can assert on membership without walking the grouping itself.
+func groupedKeys(groups []notes.StatusGroup) []string {
+	var keys []string
+
+	for _, group := range groups {
+		for _, view := range group.Issues {
+			keys = append(keys, view.Key)
+		}
+	}
+
+	return keys
+}
+
 func testCoords() notes.Coordinates {
 	return notes.Coordinates{
 		GithubBaseURL: "https://github.com/acme/widgets",

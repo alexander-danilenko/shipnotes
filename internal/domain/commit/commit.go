@@ -36,6 +36,15 @@ type Commit struct {
 	// IsReapply is true when the topic is a git "reapply" — the message git
 	// writes when you revert a revert, shaped exactly as `Reapply "<subject>"`.
 	IsReapply bool
+	// IsAlreadyShipped is true when this commit re-lands a change that was
+	// released earlier: its message carries a `git cherry-pick -x` trailer
+	// naming a commit that already sits behind the start of the reported range.
+	//
+	// Unlike the other classification fields this one cannot be decided from the
+	// message alone — answering "is that commit already behind the range start?"
+	// needs git — so the adapter fills it after reading the log, using
+	// ExtractCherryPickSources to find the candidates.
+	IsAlreadyShipped bool
 }
 
 // PrimaryIssueID returns the commit's main Jira issue key — the first one found
@@ -69,6 +78,42 @@ func ExtractIssueIDs(text string) []string {
 	}
 
 	return keys
+}
+
+// cherryPickSourcePattern matches the trailer `git cherry-pick -x` appends to a
+// message: `(cherry picked from commit <hash>)`.
+//
+// The hash capture is deliberately strict — 7 to 40 lowercase hex characters,
+// exactly the shape git itself writes. The value comes from commit-message
+// text, which anyone who can land a commit controls, and it is later handed to
+// the git command line; refusing to recognise anything else keeps a malformed
+// or hostile "hash" from ever reaching that boundary.
+var cherryPickSourcePattern = regexp.MustCompile(`\(cherry picked from commit ([0-9a-f]{7,40})\)`)
+
+// ExtractCherryPickSources returns the commits a message says it was
+// cherry-picked from, de-duplicated in first-seen order. Only git's own `-x`
+// trailer is recognised, so a message written without `-x` yields nothing. It
+// always returns a non-nil slice so callers can range over it freely.
+//
+// A message can carry more than one trailer: cherry-picking an already
+// cherry-picked commit appends a second line, one per hop.
+func ExtractCherryPickSources(message string) []string {
+	hashes := []string{}
+	if message == "" {
+		return hashes
+	}
+
+	seen := map[string]bool{}
+
+	for _, match := range cherryPickSourcePattern.FindAllStringSubmatch(message, -1) {
+		hash := match[1]
+		if !seen[hash] {
+			seen[hash] = true
+			hashes = append(hashes, hash)
+		}
+	}
+
+	return hashes
 }
 
 // IsRevertTopic reports whether a commit topic is a revert. Git's generated
