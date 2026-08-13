@@ -28,6 +28,11 @@ config:
   # That same centered-logo block precedes the H1, so the file's first line is
   # HTML rather than a heading (the H1 still follows immediately after it).
   MD041: false
+  # Plan documents carry a `title:` in their YAML frontmatter *and* a matching H1
+  # — the frontmatter is for tooling, the H1 for readers. Clearing the pattern
+  # stops the linter counting the frontmatter field as a second top-level heading.
+  MD025:
+    front_matter_title: ""
 
 # Generated, transient, or byte-locked files we never lint or rewrite.
 ignores:
