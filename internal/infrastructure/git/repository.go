@@ -99,7 +99,53 @@ func (r *Repository) Log(ctx context.Context, ref string) ([]commit.Commit, erro
 
 	r.reporter.Success("✓ Commits fetched")
 
-	return parse(output), nil
+	commits := parse(output)
+	r.markAlreadyShipped(ctx, commits, strings.TrimSpace(ref))
+
+	return commits, nil
+}
+
+// markAlreadyShipped flags the commits in the range that re-land a change
+// released earlier. A commit qualifies when it carries a `git cherry-pick -x`
+// trailer naming a commit that already sits behind rangeStart.
+//
+// One trailer is enough. Cherry-picking an already cherry-picked commit appends
+// a second trailer, one per hop, so a fix backported along a chain of
+// maintenance branches names both its original and the intermediate pick. The
+// intermediate usually lives on a branch this range knows nothing about, so
+// requiring every trailer to resolve would miss exactly the chained backports
+// this feature exists to catch. Finding one released ancestor is proof; failing
+// to resolve the others is only absence of proof.
+func (r *Repository) markAlreadyShipped(ctx context.Context, commits []commit.Commit, rangeStart string) {
+	for i := range commits {
+		for _, source := range commit.ExtractCherryPickSources(commits[i].Message) {
+			if r.isAncestor(ctx, source, rangeStart) {
+				commits[i].IsAlreadyShipped = true
+
+				break
+			}
+		}
+	}
+}
+
+// isAncestor reports whether hash is already reachable from rangeStart.
+//
+// The hash is format-checked here, not just where it was parsed: it reaches the
+// git command line from this function, and every argument this adapter passes
+// to git is validated in the same place it is used.
+//
+// Any failure means "not an ancestor". git exits 1 when the commit is simply
+// not behind rangeStart and 128 when it does not exist locally at all — a
+// shallow clone or a pruned branch — and both answers are the same one here.
+// Missing data is not evidence of a release, so the commit stays in the notes.
+func (r *Repository) isAncestor(ctx context.Context, hash, rangeStart string) bool {
+	if !isValidHashFormat(hash) {
+		return false
+	}
+
+	_, err := r.run(ctx, "merge-base", "--is-ancestor", hash, rangeStart)
+
+	return err == nil
 }
 
 // run executes `git <args...>` in the working directory and returns stdout.
