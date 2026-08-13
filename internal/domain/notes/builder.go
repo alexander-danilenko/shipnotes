@@ -58,6 +58,11 @@ func (b *Builder) Build(
 	normalCommits, revertedCommits := splitReverted(keptCommits)
 	reappliedCommits := selectReapplied(normalCommits)
 
+	// Already-shipped issues are decided from the non-revert commits, which makes
+	// the two earlier gates win for free: an excluded commit never reached this
+	// slice, and a revert has already left the issue summary by another route.
+	alreadyShipped := alreadyShippedKeys(normalCommits)
+
 	commitKeys := uniqueSortedJiraKeys(keptCommits)
 
 	// When the caller named no release issues, summarize every issue referenced
@@ -71,7 +76,7 @@ func (b *Builder) Build(
 	// fallback, so we stay quiet here to avoid a second, misleading message.
 	noSelectionMade := releaseIssueIDs == nil
 	if len(releaseIssueIDs) == 0 {
-		releaseIssueIDs = uniqueSortedJiraKeys(normalCommits)
+		releaseIssueIDs = without(uniqueSortedJiraKeys(normalCommits), alreadyShipped)
 		if len(releaseIssueIDs) > 0 && noSelectionMade {
 			b.reporter.Warn(fmt.Sprintf(
 				"⚠️  No release issue IDs given; summarizing all %d issue(s) found in the commit range.",
@@ -96,7 +101,8 @@ func (b *Builder) Build(
 	return ReleaseNotes{
 		Header: HeaderData{Date: nowISO(), Repository: coords.GithubBaseURL},
 		Summary: b.buildSummary(
-			coords, normalCommits, releaseIssueIDs, issueMap, revertedCommits, reappliedCommits, excludedCommits,
+			coords, normalCommits, releaseIssueIDs, issueMap,
+			revertedCommits, reappliedCommits, excludedCommits, alreadyShipped,
 		),
 		Commits: b.buildFlatCommits(coords, keptCommits, issueMap),
 		// Participants are the authors of the kept commits only: an excluded commit
@@ -202,6 +208,7 @@ func (b *Builder) buildSummary(
 	revertedCommits []commit.Commit,
 	reappliedCommits []commit.Commit,
 	excludedCommits []commit.Commit,
+	alreadyShipped map[string]bool,
 ) *SummaryData {
 	// When releaseIssueIDs is empty here, normalCommits carry no keys either (Build
 	// falls back to their keys), so the issue loops below produce nothing and the
@@ -225,19 +232,33 @@ func (b *Builder) buildSummary(
 	var extra []IssueView
 
 	for _, key := range sortedKeys(commitKeys) {
-		if !releaseSet[key] {
+		// An already-shipped key has its own section; it is not "extra" work in
+		// this release, so it never lands here even though it is in the commits.
+		if !releaseSet[key] && !alreadyShipped[key] {
 			found, hasIssue := issueMap[key]
 			extra = append(extra, issueView(coords, key, found, hasIssue, b.checked))
 		}
 	}
 
+	// Every already-shipped key is listed, including one the caller named with
+	// --jql: that issue stays in the release summary above and is repeated here,
+	// so a reader can see that something they expected to ship has already gone
+	// out rather than having the discrepancy silently resolved.
+	shipped := make([]IssueView, 0, len(alreadyShipped))
+
+	for _, key := range sortedKeys(alreadyShipped) {
+		found, hasIssue := issueMap[key]
+		shipped = append(shipped, issueView(coords, key, found, hasIssue, b.checked))
+	}
+
 	summary := &SummaryData{
-		ByStatus:  groupByStatus(inCommits),
-		Missing:   sortByIssueNumber(missing),
-		Extra:     groupByStatus(extra),
-		Reverted:  flatCommitViews(coords, revertedCommits),
-		Reapplied: flatCommitViews(coords, reappliedCommits),
-		Excluded:  flatCommitViews(coords, excludedCommits),
+		ByStatus:       groupByStatus(inCommits),
+		Missing:        sortByIssueNumber(missing),
+		Extra:          groupByStatus(extra),
+		AlreadyShipped: groupByStatus(shipped),
+		Reverted:       flatCommitViews(coords, revertedCommits),
+		Reapplied:      flatCommitViews(coords, reappliedCommits),
+		Excluded:       flatCommitViews(coords, excludedCommits),
 	}
 
 	if summary.isEmpty() {
@@ -274,6 +295,46 @@ func splitExcluded(commits []commit.Commit, matcher CommitMatcher) (kept, exclud
 	}
 
 	return kept, excluded
+}
+
+// alreadyShippedKeys returns the issue keys that have nothing left to ship in
+// this range: every commit carrying the key re-lands a change released earlier.
+//
+// One cherry-pick is not enough. A ticket often spans a hotfix and a follow-up,
+// and retiring it on the strength of the hotfix alone would erase the follow-up
+// from the notes — so any ordinary commit carrying the key keeps it in.
+func alreadyShippedKeys(commits []commit.Commit) map[string]bool {
+	shipped := map[string]bool{}
+	stillShipping := map[string]bool{}
+
+	for _, c := range commits {
+		for _, key := range c.JiraIssueIDs {
+			if c.IsAlreadyShipped {
+				shipped[key] = true
+			} else {
+				stillShipping[key] = true
+			}
+		}
+	}
+
+	for key := range stillShipping {
+		delete(shipped, key)
+	}
+
+	return shipped
+}
+
+// without returns the keys that are not in the excluded set, preserving order.
+func without(keys []string, excluded map[string]bool) []string {
+	kept := make([]string, 0, len(keys))
+
+	for _, key := range keys {
+		if !excluded[key] {
+			kept = append(kept, key)
+		}
+	}
+
+	return kept
 }
 
 // splitReverted separates revert commits from the rest, preserving order.
