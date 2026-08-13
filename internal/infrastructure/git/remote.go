@@ -91,6 +91,31 @@ func ParseGithubSpec(spec string) (baseURL string, ok bool) {
 	return fmt.Sprintf("https://%s/%s/%s", host, org, repo), true
 }
 
+// InferDefaultBranchRef returns the remote-tracking ref for the repository's
+// default branch, e.g. "origin/main". That is the branch releases are cut from
+// and merged back into, which makes it the natural answer to "what has already
+// shipped?" when the caller does not name one.
+//
+// It reads the symbolic ref `git clone` records; a repository with no origin,
+// or one cloned before that ref existed, yields an empty string and the caller
+// then treats already-shipped detection as unavailable.
+func InferDefaultBranchRef(ctx context.Context, dir string) string {
+	cmd := exec.CommandContext(ctx, "git", "symbolic-ref", "--quiet", "--short", "refs/remotes/origin/HEAD")
+	cmd.Dir = dir
+
+	out, err := cmd.Output()
+	if err != nil {
+		return ""
+	}
+
+	ref := strings.TrimSpace(string(out))
+	if !IsValidRefName(ref) {
+		return ""
+	}
+
+	return ref
+}
+
 // remoteURL returns the fetch URL of the repository's "origin" remote, falling
 // back to "upstream". It returns an empty string when neither exists.
 func remoteURL(ctx context.Context, dir string) string {

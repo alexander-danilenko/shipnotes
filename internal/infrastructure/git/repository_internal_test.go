@@ -58,7 +58,7 @@ func TestRepositoryAgainstRealRepo(t *testing.T) {
 	writeAndCommit(t, dir, "a.txt", "one", "First commit")
 	writeAndCommit(t, dir, "b.txt", "two", "AB-7: Second commit")
 
-	repo := New(dir, terminal.New(io.Discard))
+	repo := New(dir, terminal.New(io.Discard), "")
 	ctx := context.Background()
 
 	valid, err := repo.Validate(ctx, "HEAD")
@@ -101,47 +101,68 @@ func TestRepositoryAgainstRealRepo(t *testing.T) {
 	}
 }
 
-// absentHash is well-formed but will not exist in a freshly created repository,
-// standing in for a source commit a shallow clone or a pruned branch left behind.
-const absentHash = "0123456789abcdef0123456789abcdef01234567"
+func TestIsValidRefName(t *testing.T) {
+	valid := []string{"master", "main", "origin/main", "release/2.1", "v1.0.0", "a"}
+	// An argument starting with "-" would be read by git as an option, not a ref;
+	// the rest are shapes a branch name cannot take.
+	invalid := []string{"", "-", "--upload-pack=evil", "-b", "origin/main; rm -rf /", "with space", "/leading"}
 
-func TestLogMarksAlreadyShippedCommits(t *testing.T) {
+	for _, ref := range valid {
+		if !IsValidRefName(ref) {
+			t.Errorf("expected %q to be valid", ref)
+		}
+	}
+
+	for _, ref := range invalid {
+		if IsValidRefName(ref) {
+			t.Errorf("expected %q to be invalid", ref)
+		}
+	}
+}
+
+// setUpCherryPickedRelease builds the workflow this feature exists for: a fix
+// lands on develop, is cherry-picked out to the release branch, and ships from
+// there while develop keeps moving. It returns the range start and leaves HEAD
+// on develop.
+//
+// The commit that ends up inside the develop range is the *original*. Git wrote
+// the `cherry picked from commit …` trailer on the copy over on master, so
+// nothing in the range itself records that the change already shipped.
+func setUpCherryPickedRelease(t *testing.T, dir string) (rangeStart string) {
+	t.Helper()
+
+	runGit(t, dir, "init", "-b", "master")
+	writeAndCommit(t, dir, "base.txt", "base", "Base commit")
+	rangeStart = headHash(t, dir)
+
+	runGit(t, dir, "checkout", "-b", "develop")
+	writeAndCommit(t, dir, "fix.txt", "fix", "AB-1: urgent fix")
+	original := headHash(t, dir)
+	writeAndCommit(t, dir, "feature.txt", "feature", "AB-2: unrelated new work")
+
+	runGit(t, dir, "checkout", "master")
+	runGit(t, dir, "cherry-pick", "-x", original)
+	runGit(t, dir, "checkout", "develop")
+
+	return rangeStart
+}
+
+func TestLogMarksCommitsTheReleaseBranchAlreadyTook(t *testing.T) {
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git is not installed; skipping integration test")
 	}
 
 	dir := t.TempDir()
-	runGit(t, dir, "init")
+	rangeStart := setUpCherryPickedRelease(t, dir)
 
-	writeAndCommit(t, dir, "base.txt", "base", "Base commit")
-	writeAndCommit(t, dir, "fix.txt", "fix", "AB-1: original fix")
-	shipped := headHash(t, dir)
-
-	// Everything up to and including this commit is "already released": it is
-	// the ref the range is taken from, so `shipped` sits behind it.
-	writeAndCommit(t, dir, "cut.txt", "cut", "Release cut")
-	rangeStart := headHash(t, dir)
-
-	writeAndCommit(t, dir, "d.txt", "d", "AB-1: re-landed fix\n\n(cherry picked from commit "+shipped+")")
-	inRange := headHash(t, dir)
-
-	writeAndCommit(t, dir, "e.txt", "e", "AB-2: picked from inside the range\n\n(cherry picked from commit "+inRange+")")
-	writeAndCommit(t, dir, "f.txt", "f", "AB-3: source not in this clone\n\n(cherry picked from commit "+absentHash+")")
-	writeAndCommit(t, dir, "g.txt", "g", "AB-4: backported twice\n\n(cherry picked from commit "+shipped+")\n"+
-		"(cherry picked from commit "+absentHash+")")
-	writeAndCommit(t, dir, "h.txt", "h", "AB-5: ordinary new work")
-
-	commits, err := New(dir, terminal.New(io.Discard)).Log(context.Background(), rangeStart)
+	commits, err := New(dir, terminal.New(io.Discard), "master").Log(context.Background(), rangeStart)
 	if err != nil {
 		t.Fatalf("log: %v", err)
 	}
 
 	want := map[string]bool{
-		"AB-1: re-landed fix":                true,
-		"AB-2: picked from inside the range": false,
-		"AB-3: source not in this clone":     false,
-		"AB-4: backported twice":             true,
-		"AB-5: ordinary new work":            false,
+		"AB-1: urgent fix":         true,
+		"AB-2: unrelated new work": false,
 	}
 
 	if len(commits) != len(want) {
@@ -162,23 +183,34 @@ func TestLogMarksAlreadyShippedCommits(t *testing.T) {
 	}
 }
 
-func TestIsAncestorRejectsMalformedHash(t *testing.T) {
+// TestLogWithoutAUsableShippedRef proves the feature is inert rather than noisy
+// when there is no release branch to read: no ref, a ref that does not exist,
+// and a ref shaped like a git option all leave every commit unflagged.
+func TestLogWithoutAUsableShippedRef(t *testing.T) {
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git is not installed; skipping integration test")
 	}
 
-	dir := t.TempDir()
-	runGit(t, dir, "init")
-	writeAndCommit(t, dir, "a.txt", "one", "First commit")
+	for name, ref := range map[string]string{
+		"no ref":             "",
+		"ref does not exist": "no-such-branch",
+		"ref is an option":   "--upload-pack=evil",
+	} {
+		t.Run(name, func(t *testing.T) {
+			dir := t.TempDir()
+			rangeStart := setUpCherryPickedRelease(t, dir)
 
-	repo := New(dir, terminal.New(io.Discard))
+			commits, err := New(dir, terminal.New(io.Discard), ref).Log(context.Background(), rangeStart)
+			if err != nil {
+				t.Fatalf("log: %v", err)
+			}
 
-	// The adapter never hands git an argument it has not format-checked itself,
-	// so a hash the commit domain would have rejected is refused here too.
-	for _, hash := range []string{"abc1234; rm -rf /", "--upload-pack=evil", "abc12", ""} {
-		if repo.isAncestor(context.Background(), hash, "HEAD") {
-			t.Errorf("expected %q to be refused before reaching git", hash)
-		}
+			for _, c := range commits {
+				if c.IsAlreadyShipped {
+					t.Errorf("%q: flagged already shipped with no usable release ref", c.Topic)
+				}
+			}
+		})
 	}
 }
 

@@ -39,10 +39,7 @@ func Run(args []string, version string) int {
 			return 0
 		}
 
-		console.Failure("💥 " + err.Error())
-		console.Dim("Run 'shipnotes --help' for usage.")
-
-		return 1
+		return usageError(console, err)
 	}
 
 	// --version short-circuits before any git or Jira work: print and exit.
@@ -52,24 +49,9 @@ func Run(args []string, version string) int {
 		return 0
 	}
 
-	// Compile the --checked-statuses regexp up front so a bad pattern fails fast,
-	// before any git or Jira work, with the same hint as other argument errors.
-	checked, err := notes.NewStatusMatcher(options.checkedStatuses)
+	patterns, err := compileMatchers(options)
 	if err != nil {
-		console.Failure("💥 " + err.Error())
-		console.Dim("Run 'shipnotes --help' for usage.")
-
-		return 1
-	}
-
-	// Compile the --exclude-commits regexp up front too, for the same fail-fast
-	// reason. The zero value (empty pattern) excludes nothing.
-	excluded, err := notes.NewCommitMatcher(options.excludeCommits)
-	if err != nil {
-		console.Failure("💥 " + err.Error())
-		console.Dim("Run 'shipnotes --help' for usage.")
-
-		return 1
+		return usageError(console, err)
 	}
 
 	repoDir, err := resolveRepoDir(options.repoDir)
@@ -89,13 +71,51 @@ func Run(args []string, version string) int {
 		return 1
 	}
 
-	service := buildService(settings, repoDir, console, checked, excluded)
+	shippedRef, err := resolveShippedRef(ctx, console, options, repoDir)
+	if err != nil {
+		return usageError(console, err)
+	}
+
+	service := buildService(settings, repoDir, console, patterns, shippedRef)
 
 	return generate(ctx, console, service, application.Input{
 		CommitHash: options.commitHash,
 		OutputPath: options.output,
 		JQL:        options.jql,
 	})
+}
+
+// usageError reports a bad argument the same way everywhere: the message, then
+// the pointer to --help, then the failing exit code the caller returns.
+func usageError(console *terminal.Console, err error) int {
+	console.Failure("💥 " + err.Error())
+	console.Dim("Run 'shipnotes --help' for usage.")
+
+	return 1
+}
+
+// matchers are the two opt-in patterns the builder needs, compiled together.
+type matchers struct {
+	checked  notes.StatusMatcher
+	excluded notes.CommitMatcher
+}
+
+// compileMatchers compiles --checked-statuses and --exclude-commits up front, so
+// a bad pattern fails fast — before any git or Jira work — rather than partway
+// through a run. The zero value of either matches nothing, which is what an
+// empty pattern means.
+func compileMatchers(opts options) (matchers, error) {
+	checked, err := notes.NewStatusMatcher(opts.checkedStatuses)
+	if err != nil {
+		return matchers{}, err
+	}
+
+	excluded, err := notes.NewCommitMatcher(opts.excludeCommits)
+	if err != nil {
+		return matchers{}, err
+	}
+
+	return matchers{checked: checked, excluded: excluded}, nil
 }
 
 // loadSettings loads any .env file, resolves the (optional) GitHub repository,
@@ -157,6 +177,35 @@ func resolveGithubBaseURL(
 	return baseURL, nil
 }
 
+// resolveShippedRef determines which ref holds already-released work: the
+// --shipped-ref flag, else the repository's default branch.
+//
+// An explicit value that is not a usable ref name is fatal, for the same reason
+// an unparseable --github-repo is: the user named something specific and a typo
+// should not be silently ignored. When nothing resolves the feature is simply
+// unavailable — the function warns and returns an empty string, and the notes
+// are generated without already-shipped detection.
+func resolveShippedRef(
+	ctx context.Context, console *terminal.Console, opts options, repoDir string,
+) (string, error) {
+	if ref := strings.TrimSpace(opts.shippedRef); ref != "" {
+		if !git.IsValidRefName(ref) {
+			return "", fmt.Errorf(
+				"could not use --shipped-ref %q: expected a branch or tag name such as \"origin/main\"", ref)
+		}
+
+		return ref, nil
+	}
+
+	ref := git.InferDefaultBranchRef(ctx, repoDir)
+	if ref == "" {
+		console.Warn("⚠️  No release branch found via --shipped-ref or the git remote; " +
+			"already-shipped detection is off.")
+	}
+
+	return ref, nil
+}
+
 // warnIfNotGitHub warns when the resolved repository is not hosted on github.com.
 // The tool builds GitHub-style "/commit/" and "/pull/" link paths, so another
 // host (GitLab, Bitbucket, a self-hosted GitHub Enterprise) may produce links
@@ -210,17 +259,17 @@ func generate(
 // implementation backs each port.
 func buildService(
 	settings config.Settings, repoDir string, console *terminal.Console,
-	checked notes.StatusMatcher, excluded notes.CommitMatcher,
+	patterns matchers, shippedRef string,
 ) *application.Service {
 	jiraClient := jira.New(settings.JiraBaseURL, settings.JiraEmail, settings.JiraReadAPIToken, console)
-	builder := notes.NewBuilder(jiraClient, console, checked, excluded)
+	builder := notes.NewBuilder(jiraClient, console, patterns.checked, patterns.excluded)
 	coords := notes.Coordinates{
 		GithubBaseURL: settings.GithubBaseURL,
 		JiraBaseURL:   settings.JiraBaseURL,
 	}
 
 	return application.New(
-		git.New(repoDir, console),
+		git.New(repoDir, console, shippedRef),
 		builder,
 		markdown.New(),
 		fileoutput.New(),

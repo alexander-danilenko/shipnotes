@@ -26,6 +26,10 @@ type options struct {
 	// notes into the "Excluded commits" section. Empty (the default) excludes
 	// nothing.
 	excludeCommits string
+	// shippedRef is the branch or tag holding already-released work; issues whose
+	// commits it cherry-picked are reported as already shipped rather than as
+	// part of this release. Empty infers the repository's default branch.
+	shippedRef string
 	// The following four override their environment-variable counterparts so the
 	// tool can run without a .env file. Each is "" when the flag was not given,
 	// which falls back to the environment (and, for githubRepo, the git remote).
@@ -54,6 +58,9 @@ func registerFlags(fs *flag.FlagSet, opts *options) {
 		"Case-insensitive regexp; issues whose status fully matches render as checked ([x]). Empty disables.")
 	fs.StringVar(&opts.excludeCommits, "exclude-commits", "",
 		"Case-insensitive regexp; commits whose subject matches are excluded from the notes. Empty keeps all.")
+	fs.StringVar(&opts.shippedRef, "shipped-ref", "",
+		"Branch or tag holding already-released work; issues it cherry-picked are marked already shipped "+
+			"(defaults to the repository's default branch)")
 	fs.StringVar(&opts.jiraEmail, "jira-email", "", "Jira account email (overrides SHIPNOTES_JIRA_EMAIL)")
 	fs.StringVar(&opts.jiraToken, "jira-token", "", "Jira read API token (overrides SHIPNOTES_JIRA_TOKEN)")
 	fs.StringVar(&opts.jiraBaseURL, "jira-base-url", "", "Jira site base URL (overrides SHIPNOTES_JIRA_BASE_URL)")
@@ -115,6 +122,15 @@ Options:
                       The subject carries the Jira key, so you can also exclude by
                       ticket; anchor it ('\bPROJ-42\b') to avoid also matching
                       PROJ-420. Empty (the default) keeps every commit.
+  --shipped-ref REF   Branch or tag that holds already-released work, e.g.
+                      "origin/main" or "release/2.1". shipnotes reads the
+                      "cherry picked from commit ..." trailers in that ref's
+                      history: any commit in the range it names was already
+                      released, so its issue moves to "Already shipped" instead
+                      of the release summary. Defaults to the repository's
+                      default branch; detection is skipped when neither
+                      resolves. Requires that the cherry-picks were made with
+                      'git cherry-pick -x', which writes those trailers.
   --jira-email EMAIL  Jira account email. Overrides SHIPNOTES_JIRA_EMAIL.
   --jira-token TOKEN  Jira read-scoped API token. Overrides SHIPNOTES_JIRA_TOKEN.
   --jira-base-url URL Jira site base URL. Overrides SHIPNOTES_JIRA_BASE_URL.
