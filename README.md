@@ -201,6 +201,16 @@ One pattern can drop commits by type, such as `^(chore|docs|test|ci|build)(\(|:)
 
 Matching commits leave the commit-history table and the Release summary. They aren't deleted — they move to an "Excluded commits" section, so the notes stay auditable. This section appears even when the range has no Jira issues at all. Exclusion is the first gate: a matched commit is reported only as excluded, even if it's also a revert or reapply. Pass an empty string (the default) to keep every commit.
 
+### Already shipped
+
+A change can reach production twice. A fix lands, gets cherry-picked onto a maintenance branch, ships from there, and comes back to the mainline when that branch merges in. By the time you cut the next range the returning commit is inside it, even though its ticket went out weeks ago.
+
+shipnotes spots that on its own, with no flag to set. When a commit carries the `(cherry picked from commit …)` trailer that `git cherry-pick -x` writes, and that source commit already sits behind the start of your range, the change was released earlier. If *every* commit for a ticket is one of those, the ticket moves to an "Already shipped" section instead of the release summary — a ticket that also has new work in the range stays where it is.
+
+The commits themselves stay in the commit-history table, so nothing disappears. A ticket you named explicitly with `--jql` stays in the release summary *and* appears under "Already shipped", so you can see that something you expected to ship has already gone out.
+
+This only works if your team passes `-x` when cherry-picking; git writes the trailer nowhere else. Without it, nothing is detected and the output is exactly as before.
+
 ## Development
 
 ```bash
