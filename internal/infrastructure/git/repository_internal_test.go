@@ -214,6 +214,100 @@ func TestLogWithoutAUsableShippedRef(t *testing.T) {
 	}
 }
 
+// setUpDuplicateInRange builds the other shape of the same workflow: the fix is
+// applied to the release branch directly, ahead of the release, and develop is
+// merged in afterwards. Both copies of the change therefore sit inside one
+// range, which is read from the release branch.
+//
+// withTrailer picks which evidence the range carries. With `-x` the copy names
+// the original outright; without it the two commits are linked by nothing but
+// identical content.
+func setUpDuplicateInRange(t *testing.T, dir string, withTrailer bool) (rangeStart string) {
+	t.Helper()
+
+	runGit(t, dir, "init", "-b", "master")
+	writeAndCommit(t, dir, "base.txt", "base", "Base commit")
+	rangeStart = headHash(t, dir)
+
+	runGit(t, dir, "checkout", "-b", "develop")
+	writeAndCommit(t, dir, "fix.txt", "fix", "AB-1: urgent fix")
+	original := headHash(t, dir)
+	writeAndCommit(t, dir, "feature.txt", "feature", "AB-2: unrelated new work")
+
+	runGit(t, dir, "checkout", "master")
+	// Master has to move on its own before the pick. Otherwise the copy would
+	// share a parent, a tree, a message and a timestamp with the original and git
+	// would hand back the very same commit object — no duplicate to detect.
+	writeAndCommit(t, dir, "prep.txt", "prep", "AB-3: release prep")
+
+	if withTrailer {
+		runGit(t, dir, "cherry-pick", "-x", original)
+	} else {
+		runGit(t, dir, "cherry-pick", original)
+	}
+
+	// The merge brings the original over, so master now holds both copies.
+	runGit(t, dir, "merge", "--no-ff", "-m", "Merge branch 'develop'", "develop")
+
+	return rangeStart
+}
+
+// TestLogMarksDuplicatesInsideTheRange covers the release-branch reading:
+// the copy applied to master directly and the original that arrives with the
+// merge are both flagged, so their issue has nothing left to ship. Unrelated
+// work in the same range is untouched.
+func TestLogMarksDuplicatesInsideTheRange(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git is not installed; skipping integration test")
+	}
+
+	for name, withTrailer := range map[string]bool{
+		"cherry-picked with -x":    true,
+		"cherry-picked without -x": false,
+	} {
+		t.Run(name, func(t *testing.T) {
+			dir := t.TempDir()
+			rangeStart := setUpDuplicateInRange(t, dir, withTrailer)
+
+			commits, err := New(dir, terminal.New(io.Discard), "master").Log(context.Background(), rangeStart)
+			if err != nil {
+				t.Fatalf("log: %v", err)
+			}
+
+			// A merge carries no diff of its own, so it can never pair with anything.
+			want := map[string]bool{
+				"AB-1: urgent fix":         true,
+				"AB-2: unrelated new work": false,
+				"AB-3: release prep":       false,
+				"Merge branch 'develop'":   false,
+			}
+
+			var fixes int
+
+			for _, c := range commits {
+				expected, known := want[c.Topic]
+				if !known {
+					t.Errorf("unexpected commit in range: %q", c.Topic)
+
+					continue
+				}
+
+				if c.Topic == "AB-1: urgent fix" {
+					fixes++
+				}
+
+				if c.IsAlreadyShipped != expected {
+					t.Errorf("%q: IsAlreadyShipped = %v, want %v", c.Topic, c.IsAlreadyShipped, expected)
+				}
+			}
+
+			if fixes != 2 {
+				t.Fatalf("expected both copies of the fix in the range, got %d", fixes)
+			}
+		})
+	}
+}
+
 // headHash returns the full hash of the repository's current HEAD.
 func headHash(t *testing.T, dir string) string {
 	t.Helper()

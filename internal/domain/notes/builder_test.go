@@ -193,6 +193,40 @@ func TestBuildKeepsAlreadyShippedOutOfExtra(t *testing.T) {
 	assertSingleIssue(t, data.Summary.AlreadyShipped, "Done", "PROJ-104")
 }
 
+// TestBuildRetiresATicketBothOfWhoseCopiesShipped is the end-to-end contract for
+// a change that landed twice inside one range — applied to the release branch
+// directly, then brought over again by the merge. The git adapter flags both
+// copies, and the ticket must then leave "Extra" for "Already shipped" rather
+// than reading as new work. Its commits stay in the history all the same.
+func TestBuildRetiresATicketBothOfWhoseCopiesShipped(t *testing.T) {
+	commits := []commit.Commit{
+		{
+			CanonicalHash: "h1", Hash: "h1", Topic: "PROJ-108: urgent fix",
+			JiraIssueIDs: []string{"PROJ-108"}, Authors: []string{"Jane"}, IsAlreadyShipped: true,
+		},
+		{
+			CanonicalHash: "h2", Hash: "h2", Topic: "PROJ-108: urgent fix",
+			JiraIssueIDs: []string{"PROJ-108"}, Authors: []string{"Jane"}, IsAlreadyShipped: true,
+		},
+	}
+	builder := newBuilder([]issue.Issue{issueWithStatus("PROJ-108", "Urgent fix", "Done")})
+
+	data, err := builder.Build(context.Background(), testCoords(), commits, []string{"PROJ-109"})
+	if err != nil {
+		t.Fatalf("build: %v", err)
+	}
+
+	if keys := groupedKeys(data.Summary.Extra); len(keys) != 0 {
+		t.Errorf("extra: got %v, want none — both copies of the change already shipped", keys)
+	}
+
+	assertSingleIssue(t, data.Summary.AlreadyShipped, "Done", "PROJ-108")
+
+	if len(data.Commits) != 2 {
+		t.Errorf("commits: got %d, want both copies still in the history table", len(data.Commits))
+	}
+}
+
 // TestBuildEarlierGatesOutrankAlreadyShipped proves the precedence chain:
 // exclusion runs first, then reverts, and a commit caught by either is reported
 // there instead of under "Already shipped".

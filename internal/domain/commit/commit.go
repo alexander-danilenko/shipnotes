@@ -36,14 +36,16 @@ type Commit struct {
 	// IsReapply is true when the topic is a git "reapply" — the message git
 	// writes when you revert a revert, shaped exactly as `Reapply "<subject>"`.
 	IsReapply bool
-	// IsAlreadyShipped is true when this commit re-lands a change that was
-	// released earlier: its message carries a `git cherry-pick -x` trailer
-	// naming a commit that already sits behind the start of the reported range.
+	// IsAlreadyShipped is true when this commit's change has already gone out,
+	// on either of two kinds of evidence: the release branch says it
+	// cherry-picked this commit, or another commit in the same range carries the
+	// very same change (linked by a `cherry-pick -x` trailer, or simply
+	// identical in content) and so lands it twice.
 	//
 	// Unlike the other classification fields this one cannot be decided from the
-	// message alone — answering "is that commit already behind the range start?"
-	// needs git — so the adapter fills it after reading the log, using
-	// ExtractCherryPickSources to find the candidates.
+	// message alone — both questions need to look outside the single commit — so
+	// the adapter fills it after reading the log, using ExtractCherryPickSources
+	// to find the explicit links.
 	IsAlreadyShipped bool
 }
 

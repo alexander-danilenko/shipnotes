@@ -298,7 +298,8 @@ func splitExcluded(commits []commit.Commit, matcher CommitMatcher) (kept, exclud
 }
 
 // alreadyShippedKeys returns the issue keys that have nothing left to ship in
-// this range: every commit carrying the key re-lands a change released earlier.
+// this range: every commit carrying the key re-lands a change that has already
+// gone out, or duplicates another commit in the range that carries it.
 //
 // One cherry-pick is not enough. A ticket often spans a hotfix and a follow-up,
 // and retiring it on the strength of the hotfix alone would erase the follow-up

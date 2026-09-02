@@ -54,6 +54,11 @@ func Run(args []string, version string) int {
 		return usageError(console, err)
 	}
 
+	// From here on the run is under way, so the banner goes up first and the
+	// resolution notes and warnings below it read as part of the run rather than
+	// as stray output above the title.
+	console.Header()
+
 	repoDir, err := resolveRepoDir(options.repoDir)
 	if err != nil {
 		console.Failure("💥 " + err.Error())
@@ -194,6 +199,8 @@ func resolveShippedRef(
 				"could not use --shipped-ref %q: expected a branch or tag name such as \"origin/main\"", ref)
 		}
 
+		console.Dim(fmt.Sprintf("Reading already-released work from %s.", ref))
+
 		return ref, nil
 	}
 
@@ -201,7 +208,16 @@ func resolveShippedRef(
 	if ref == "" {
 		console.Warn("⚠️  No release branch found via --shipped-ref or the git remote; " +
 			"already-shipped detection is off.")
+
+		return "", nil
 	}
+
+	// An inferred ref is a guess, and a wrong guess is silent: the scan simply
+	// finds nothing and every already-released issue reads as new work. Say which
+	// branch was picked so a repository whose releases go out from somewhere other
+	// than its default branch is obvious rather than puzzling.
+	console.Dim(fmt.Sprintf(
+		"Reading already-released work from %s (the repository's default branch; override with --shipped-ref).", ref))
 
 	return ref, nil
 }
@@ -238,8 +254,6 @@ func firstNonEmpty(values ...string) string {
 func generate(
 	ctx context.Context, console *terminal.Console, service *application.Service, input application.Input,
 ) int {
-	console.Header()
-
 	result, err := service.Run(ctx, input)
 	if err != nil {
 		console.Failure("\n💥 Failed to generate release notes\n")

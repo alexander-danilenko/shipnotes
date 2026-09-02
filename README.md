@@ -120,7 +120,7 @@ shipnotes <commit_hash> [options]
 - **`--jql "QUERY"`** — JQL query whose matching issues become the expected release list (the "Release summary" section). When omitted, every issue found in the range is summarized.
 - **`--checked-statuses REGEXP`** — Case-insensitive regexp matched against each issue's full status; matching issues render as completed (`[x]`) in the summary. Pass `""` to disable (default: `done|ready to release|ready for release`).
 - **`--exclude-commits REGEXP`** — Case-insensitive (unanchored) regexp matched against each commit's subject; matching commits are dropped from the notes into an "Excluded commits" section. Empty keeps every commit (default: empty).
-- **`--shipped-ref REF`** — Branch or tag holding already-released work, e.g. `origin/main`. Issues whose commits that branch cherry-picked move to an "Already shipped" section (default: the repository's default branch).
+- **`--shipped-ref REF`** — Branch or tag holding already-released work, e.g. `origin/main`. Issues whose commits that branch cherry-picked move to an "Already shipped" section, as do issues whose change lands twice inside the range itself (default: the repository's default branch).
 - **`--jira-base-url URL`** — Jira base URL. Overrides `SHIPNOTES_JIRA_BASE_URL` (default: from env).
 - **`--jira-email EMAIL`** — Jira account email. Overrides `SHIPNOTES_JIRA_EMAIL` (default: from env).
 - **`--jira-token TOKEN`** — Jira read-scoped API token. Overrides `SHIPNOTES_JIRA_TOKEN` (default: from env).
@@ -208,9 +208,13 @@ Some work ships ahead of the release it belongs to. A fix lands on `develop`, yo
 
 shipnotes recognizes it by reading the release branch. `git cherry-pick -x` records `(cherry picked from commit …)` on the **copy**, naming the original, so the evidence lives on `master`, not on the commit in your range. shipnotes scans that branch's history for those trailers: any commit in your range they name has already been released. If *every* commit for a ticket is one of those, the ticket moves to an "Already shipped" section instead of the release summary — a ticket that also has new work in the range stays where it is.
 
+The same change can also land twice inside a *single* range. You apply a fix to `master` directly, ahead of the release, and later merge `develop` in — now the range holds the copy you shipped early and the original that came over with the merge: two commits, the same change, different hashes. Reading the release branch flags only the original, and one unflagged commit is enough to keep the ticket in the release summary, so it shows up under "Extra (not in release list)" as if it were new.
+
+So shipnotes also pairs commits up *within* the range, on either of two kinds of evidence. A `cherry-pick -x` trailer naming another commit in the same range is an explicit link, and it survives a pick that had to be adapted around a conflict. Failing that, an identical `git patch-id` is content equality — the only thing left when the pick was made without `-x`, through a web UI for instance. Both copies are then marked, so the ticket has nothing left to ship and moves to "Already shipped". A merge commit carries no patch of its own and can never be paired with anything, and a ticket that also has genuinely new work in the range still stays in the release.
+
 The commits themselves stay in the commit-history table, so nothing disappears. A ticket you named explicitly with `--jql` stays in the release summary *and* appears under "Already shipped", so you can see that something you expected to ship has already gone out.
 
-`--shipped-ref` names the branch to read; it defaults to your repository's default branch, which is usually what you want. Two requirements: the cherry-picks must have been made with `-x` (git writes the trailer nowhere else), and the original commit must not have been rewritten since, or the recorded hash no longer matches. When neither holds, nothing is detected and the output is exactly as before.
+`--shipped-ref` names the branch to read; it defaults to your repository's default branch. shipnotes prints which branch it settled on at the start of every run, because an inferred ref is a guess and a wrong guess is otherwise silent — if your releases go out from `master` while `origin/HEAD` points at `develop`, the scan finds nothing and every already-released issue reads as new work. One case stays invisible: a copy that sits *behind* the start of your range and was picked without `-x` leaves no evidence either pass can reach. A rewritten original likewise breaks the recorded hash. When nothing is found, the output is exactly as before.
 
 ## Development
 

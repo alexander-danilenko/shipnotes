@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"regexp"
 	"strings"
+	"sync"
 
 	"github.com/alexander-danilenko/shipnotes/internal/domain/commit"
 	"github.com/alexander-danilenko/shipnotes/internal/domain/report"
@@ -100,14 +101,44 @@ func (r *Repository) Log(ctx context.Context, ref string) ([]commit.Commit, erro
 
 	r.reporter.Status("Fetching commits...")
 
-	output, err := r.run(ctx,
-		"-c", "color.ui=false",
-		"--no-pager",
-		"log",
-		strings.TrimSpace(ref)+"..HEAD",
-		"--pretty=format:commit %H%nAuthor: %an <%ae>%nDate: %ai%n%n%B%n---%n",
-		"--date=iso",
+	rangeStart := strings.TrimSpace(ref)
+
+	// Three independent reads of the same repository: the range itself, what the
+	// release branch says it cherry-picked, and the patch ids of the range. None
+	// needs another's answer, and the last two walk history that can be long, so
+	// they run together and the slowest one sets the wait.
+	//
+	// Nothing here touches the reporter — progress stays on this goroutine, so
+	// the console is never written to from two places at once.
+	var (
+		wait        sync.WaitGroup
+		output      string
+		err         error
+		released    map[string]bool
+		patchGroups map[string][]string
 	)
+
+	wait.Go(func() {
+		output, err = r.run(ctx,
+			"-c", "color.ui=false",
+			"--no-pager",
+			"log",
+			rangeStart+"..HEAD",
+			"--pretty=format:commit %H%nAuthor: %an <%ae>%nDate: %ai%n%n%B%n---%n",
+			"--date=iso",
+		)
+	})
+
+	wait.Go(func() {
+		released = r.releasedSources(ctx)
+	})
+
+	wait.Go(func() {
+		patchGroups = r.patchIDs(ctx, rangeStart)
+	})
+
+	wait.Wait()
+
 	if err != nil {
 		r.reporter.Failure("✗ Failed to fetch commits")
 
@@ -117,7 +148,8 @@ func (r *Repository) Log(ctx context.Context, ref string) ([]commit.Commit, erro
 	r.reporter.Success("✓ Commits fetched")
 
 	commits := parse(output)
-	r.markAlreadyShipped(ctx, commits)
+	markAlreadyShipped(commits, released)
+	markDuplicates(commits, patchGroups)
 
 	return commits, nil
 }
@@ -132,15 +164,10 @@ func (r *Repository) Log(ctx context.Context, ref string) ([]commit.Commit, erro
 // Reading the range alone can never recognise it; the only record of the
 // release lives in what the release branch says it took.
 //
-// So the lookup runs the other way: one pass over the release ref collects
-// every commit it claims to have copied, and anything in the range named there
-// has already shipped.
-func (r *Repository) markAlreadyShipped(ctx context.Context, commits []commit.Commit) {
-	released := r.releasedSources(ctx)
-	if len(released) == 0 {
-		return
-	}
-
+// So the lookup runs the other way: releasedSources collects every commit the
+// release ref claims to have copied, and anything in the range named there has
+// already shipped.
+func markAlreadyShipped(commits []commit.Commit, released map[string]bool) {
 	for i := range commits {
 		if released[commits[i].CanonicalHash] {
 			commits[i].IsAlreadyShipped = true
@@ -184,6 +211,99 @@ func (r *Repository) releasedSources(ctx context.Context) map[string]bool {
 	return sources
 }
 
+// markDuplicates flags the commits that land the *same* change twice inside the
+// reported range.
+//
+// This is the other half of the workflow markAlreadyShipped serves. When a fix
+// is applied to the release branch directly and the development branch is later
+// merged in, both copies end up inside one range: the original that came over
+// with the merge, and the copy that shipped ahead of it. The release-ref scan
+// alone flags only the original — nothing names the copy — and one unflagged
+// commit is enough to keep the whole issue in the release summary, so the issue
+// surfaces as new work.
+//
+// Two kinds of evidence pair them up, and they catch different cases. A
+// `cherry-pick -x` trailer naming another commit *in this range* is an explicit
+// link that survives a pick which had to be adapted around a conflict. An
+// identical patch id is content equality, which is the only thing left when the
+// pick was made without `-x` (through a web UI, say).
+//
+// Every member of a matched pair is flagged, not all-but-one: the issue moves to
+// "Already shipped" only when every one of its commits is flagged, so flagging a
+// single side would leave the issue looking like new work. A genuinely new
+// commit on the same issue is still unflagged and still holds it in the release.
+func markDuplicates(commits []commit.Commit, patchGroups map[string][]string) {
+	inRange := make(map[string]int, len(commits))
+	for i := range commits {
+		inRange[commits[i].CanonicalHash] = i
+	}
+
+	// The explicit link: a commit here says it is a copy of a commit also here.
+	for i := range commits {
+		for _, source := range commit.ExtractCherryPickSources(commits[i].Message) {
+			if j, ok := inRange[source]; ok {
+				commits[i].IsAlreadyShipped = true
+				commits[j].IsAlreadyShipped = true
+			}
+		}
+	}
+
+	// Content equality: same patch, different hash.
+	for _, hashes := range patchGroups {
+		// A patch carried by a single commit is not a copy of anything.
+		if len(hashes) == 1 {
+			continue
+		}
+
+		for _, hash := range hashes {
+			if i, ok := inRange[hash]; ok {
+				commits[i].IsAlreadyShipped = true
+			}
+		}
+	}
+}
+
+// patchIDs groups the commits in the range by the identity of the change they
+// carry, as computed by `git patch-id`. The returned map is keyed by patch id;
+// any entry holding more than one hash is the same change applied twice.
+//
+// Commits with no diff of their own — merges, empty commits — produce no patch
+// id at all, so they can never be paired with anything.
+//
+// Like releasedSources, this fails open: any error yields nothing and the notes
+// then keep every commit, because absent evidence is not evidence of a
+// duplicate.
+func (r *Repository) patchIDs(ctx context.Context, ref string) map[string][]string {
+	output, err := r.runPiped(ctx,
+		[]string{
+			"-c", "color.ui=false",
+			"--no-pager",
+			"log",
+			"--patch",
+			"--format=commit %H",
+			ref + "..HEAD",
+		},
+		[]string{"patch-id", "--stable"},
+	)
+	if err != nil {
+		return nil
+	}
+
+	// Each line is "<patch id> <commit hash>".
+	groups := map[string][]string{}
+
+	for line := range strings.SplitSeq(output, "\n") {
+		patchID, hash, ok := strings.Cut(strings.TrimSpace(line), " ")
+		if !ok {
+			continue
+		}
+
+		groups[patchID] = append(groups[patchID], hash)
+	}
+
+	return groups
+}
+
 // run executes `git <args...>` in the working directory and returns stdout.
 // On failure it includes git's stderr in the error so problems are visible.
 func (r *Repository) run(ctx context.Context, args ...string) (string, error) {
@@ -203,6 +323,52 @@ func (r *Repository) run(ctx context.Context, args ...string) (string, error) {
 		}
 
 		return "", err
+	}
+
+	return stdout.String(), nil
+}
+
+// runPiped executes `git <first...> | git <second...>` in the working directory
+// and returns the second command's stdout.
+//
+// The output of the first command is streamed into the second rather than held
+// in memory: the one caller pipes a full release diff, which can be large.
+func (r *Repository) runPiped(ctx context.Context, first, second []string) (string, error) {
+	//nolint:gosec // G204: the program is always "git"; the ref argument is format-validated before reaching here.
+	producer := exec.CommandContext(ctx, "git", first...)
+	producer.Dir = r.workingDir
+
+	//nolint:gosec // G204: the program is always "git"; these arguments are literals.
+	consumer := exec.CommandContext(ctx, "git", second...)
+	consumer.Dir = r.workingDir
+
+	pipe, err := producer.StdoutPipe()
+	if err != nil {
+		return "", err
+	}
+
+	consumer.Stdin = pipe
+
+	var stdout, producerErr, consumerErr strings.Builder
+
+	consumer.Stdout = &stdout
+	producer.Stderr = &producerErr
+	consumer.Stderr = &consumerErr
+
+	if err := producer.Start(); err != nil {
+		return "", err
+	}
+
+	if err := consumer.Run(); err != nil {
+		// The producer still holds the pipe; releasing it keeps the process from
+		// lingering when the consumer died early.
+		_ = producer.Wait()
+
+		return "", fmt.Errorf("%w: %s", err, strings.TrimSpace(consumerErr.String()))
+	}
+
+	if err := producer.Wait(); err != nil {
+		return "", fmt.Errorf("%w: %s", err, strings.TrimSpace(producerErr.String()))
 	}
 
 	return stdout.String(), nil
