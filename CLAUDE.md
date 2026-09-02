@@ -85,6 +85,9 @@ Prefer the **Go language server (`gopls`) via the LSP tool** when it is availabl
 ```text
 shipnotes/
 ├── main.go                          # Thin entry point: calls cli.Run.
+├── CONCEPTS.md                      # Shared domain vocabulary (range, gates, already
+│                                    #   shipped, shipped ref) — relevant when orienting
+│                                    #   to the codebase or discussing domain concepts.
 ├── internal/
 │   ├── domain/                       # THE CORE — entities + ports, no I/O.
 │   │   ├── commit/   commit.go       #   Commit entity + revert/reapply/cherry-pick/key rules.
