@@ -2,7 +2,7 @@
 # Every available setting, with its default, is documented in the plugin's example:
 # https://github.com/EveryInc/compound-engineering-plugin/blob/main/.compound-engineering/config.example.yaml
 
-# Plans, learnings and other CE output. The root .gitignore keeps docs/ out of git.
+# Plans, learnings and other CE output. docs/solutions/ is tracked; docs/plans/ and docs/brainstorms/ are gitignored.
 docs_root: docs
 # The team runs Claude Code only, so ce-code-review and ce-doc-review send no diff to a second model.
 cross_model_review_mode: off
