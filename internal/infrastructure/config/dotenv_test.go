@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -116,6 +117,20 @@ func TestLoadDotEnvFileExplicitPath(t *testing.T) {
 
 	if got := os.Getenv("EXPLICIT_VAR"); got != "explicit-value" {
 		t.Errorf("explicit env file not loaded: got %q", got)
+	}
+}
+
+func TestLoadDotEnvFileExplicitUnreadableLineIsError(t *testing.T) {
+	// A line longer than bufio.Scanner's 64 KiB limit stops the scan mid-file.
+	path := filepath.Join(t.TempDir(), "long.env")
+	content := "LONG_VAR=" + strings.Repeat("x", 70*1024) + "\n"
+
+	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+		t.Fatalf("write env file: %v", err)
+	}
+
+	if err := loadDotEnvFile(path); err == nil {
+		t.Fatal("expected an error for an explicit env file that cannot be read to the end")
 	}
 }
 

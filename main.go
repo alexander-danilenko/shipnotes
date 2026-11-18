@@ -26,7 +26,7 @@ import (
 // It is the one source of the release version: when a push to main changes it,
 // .github/workflows/release.yml tags v<version> and GoReleaser publishes the
 // release (see "Releases" in CLAUDE.md).
-const version = "0.5.0"
+const version = "0.5.1"
 
 func main() {
 	os.Exit(cli.Run(os.Args[1:], version))

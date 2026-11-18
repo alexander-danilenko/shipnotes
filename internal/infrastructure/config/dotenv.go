@@ -53,6 +53,13 @@ func loadDotEnvFile(explicitPath string) error {
 		_ = os.Setenv(key, value)
 	}
 
+	// Scan stops on a read error (or a line over 64 KiB) exactly as it stops at
+	// the end of the file, so without this check the rest of the file would be
+	// silently skipped. Same rule as opening: fatal only for an explicit file.
+	if err := scanner.Err(); err != nil && explicitPath != "" {
+		return fmt.Errorf("could not read --env-file %q: %w", explicitPath, err)
+	}
+
 	return nil
 }
 

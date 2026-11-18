@@ -13,6 +13,7 @@ linters:
   default: all
   disable:
     - exhaustruct      # Demands every struct field at every literal; fights Go's useful zero values.
+    - exhaustruct_v5   # Successor of exhaustruct (golangci-lint 2.13); same reason. `default: all` turns on a new successor even when its predecessor is disabled.
     - gochecknoglobals # Package-level compiled regexps and templates are the idiomatic, safe pattern.
     - varnamelen       # Short names (i, w, c, ok, err) are idiomatic Go and read fine in small scopes.
     - nonamedreturns   # Named returns are used deliberately here to document what each value means.
