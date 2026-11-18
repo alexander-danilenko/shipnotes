@@ -31,7 +31,7 @@ Work that was cherry-picked and released ahead of the current range still read a
 
 ## What Didn't Work
 
-- **Trusting the inferred `--shipped-ref`.** `resolveShippedRef` falls back to `git.InferDefaultBranchRef` (`internal/cli/cli.go:207`), which reads `refs/remotes/origin/HEAD` (`internal/infrastructure/git/remote.go:102-103`). On the downstream repository where this surfaced, `origin/HEAD` pointed at `origin/develop` while releases went out from `origin/master`. A ref *did* resolve, so the "no release branch found" warning never fired; the scan simply read the wrong branch and found none of the ~150 cherry-pick trailers sitting on `origin/master` (counted there at the time; not reproducible from this repository). This was the entire cause of the reported symptom — the detection code was correct and pointed somewhere useless.
+- **Trusting the inferred `--shipped-ref`.** `resolveShippedRef` falls back to `git.InferDefaultBranchRef` (`internal/cli/cli.go:206`), which reads `refs/remotes/origin/HEAD` (`internal/infrastructure/git/remote.go:102-103`). On the downstream repository where this surfaced, `origin/HEAD` pointed at `origin/develop` while releases went out from `origin/master`. A ref *did* resolve, so the "no release branch found" warning never fired; the scan simply read the wrong branch and found none of the ~150 cherry-pick trailers sitting on `origin/master` (counted there at the time; not reproducible from this repository). This was the entire cause of the reported symptom — the detection code was correct and pointed somewhere useless.
 - **Reading cherry-pick trailers only from the release branch.** That direction is right when the fix is cherry-picked *out* to a release branch: git writes `(cherry picked from commit …)` on the copy, so the original arriving in the range carries nothing to inspect. It is wrong when the fix was applied to the release branch *directly* and the development branch merged in afterwards — then both copies sit in one range, and only the original gets flagged.
 - **Relying on the `-x` trailer alone.** Picks made through the GitHub UI carry no trailer, so `ExtractCherryPickSources` (`internal/domain/commit/commit.go:102`) returns nothing for them and no link exists to follow.
 - **A test fixture that cherry-picks onto an unmoved branch.** Without `-x`, the copy shares its parent, tree, message, author, and timestamp with the original, so git hands back the *same commit object* — there is no duplicate to detect and the test fails for a reason that has nothing to do with the code under test. The branch has to move first (`internal/infrastructure/git/repository_internal_test.go:238`).
@@ -47,7 +47,7 @@ Two parts, both needed.
 shipnotes <ref> --shipped-ref origin/master
 ```
 
-`resolveShippedRef` now prints what it settled on, and says when the value was inferred rather than given (`internal/cli/cli.go:202`, `internal/cli/cli.go:219`):
+`resolveShippedRef` now prints what it settled on, and says when the value was inferred rather than given (`internal/cli/cli.go:201`, `internal/cli/cli.go:219`):
 
 ```text
 Reading already-released work from origin/develop (the repository's default branch; override with --shipped-ref).
