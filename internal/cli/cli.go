@@ -26,8 +26,7 @@ import (
 )
 
 // Run is the program's real entry point: it returns a process exit code. The
-// version string is stamped into the binary at build time (see main.version)
-// and reported by --version. Keeping Run separate from main makes the program
+// version string comes from main.version and is reported by --version. Keeping Run separate from main makes the program
 // straightforward to test.
 func Run(args []string, version string) int {
 	console := terminal.New(os.Stdout)

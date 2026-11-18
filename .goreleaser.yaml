@@ -1,7 +1,8 @@
 # yaml-language-server: $schema=https://goreleaser.com/static/schema.json
 # GoReleaser configuration — https://goreleaser.com
 #
-# Invoked by .github/workflows/release.yml when a version tag (v*) is pushed.
+# Invoked by .github/workflows/release.yml when a push to main bumps const
+# version in main.go. The version lives in that const, not in ldflags.
 # It cross-compiles the binary for every supported platform, packages the
 # archives and a checksums file, and publishes them as a GitHub release.
 #
@@ -16,12 +17,11 @@ builds:
     # A statically linked binary (no libc) that runs on any matching OS/arch.
     env:
       - CGO_ENABLED=0
-    # -trimpath strips local filesystem paths; the -X flag stamps the git tag
-    # into main.version so `shipnotes --version` reports the release.
+    # -trimpath strips local filesystem paths; -s -w drops debug symbols.
     flags:
       - -trimpath
     ldflags:
-      - -s -w -X main.version={{ .Tag }}
+      - -s -w
     goos:
       - linux
       - darwin

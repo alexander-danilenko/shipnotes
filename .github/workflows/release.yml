@@ -1,35 +1,64 @@
-# Builds the cross-platform binaries and publishes a GitHub release whenever a
-# version tag (e.g. v1.2.0) is pushed. The heavy lifting is in .goreleaser.yaml.
+# Publishes a release when a push to main carries a const version in main.go
+# that has no tag yet: it tags v<version> and runs GoReleaser (.goreleaser.yaml).
+# main.go is the one source of the version: nobody tags by hand.
 name: release
 
 on:
   push:
-    tags:
-      - "v*"
+    branches: [main]
 
 permissions:
-  contents: write # create the release and upload the binary assets
+  contents: write # push the tag, create the release and upload the binaries
 
 jobs:
-  goreleaser:
-    name: Build and publish release
+  release:
+    name: Tag and publish release
     runs-on: ubuntu-latest
     steps:
       - name: Check out the repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0 # GoReleaser needs full history and tags for the changelog
+          fetch-depth: 0 # GoReleaser builds the changelog from the previous tag
 
-      - name: Set up Go
+      - name: Read the version and check it is not released yet
+        id: tag
+        run: |
+          version=$(sed -n 's/^const version = "\(.*\)"$/\1/p' main.go)
+          if [ -z "$version" ]; then
+            echo "no const version in main.go" >&2
+            exit 1
+          fi
+          if git rev-parse -q --verify "refs/tags/v$version" >/dev/null; then
+            echo "v$version is already released"
+            exit 0
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "new=true" >> "$GITHUB_OUTPUT"
+
+      - if: steps.tag.outputs.new == 'true'
+        name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version-file: go.mod # stay in lockstep with the module's Go version
+          go-version-file: go.mod
 
-      - name: Run GoReleaser
+      # Never tag a commit whose tests fail.
+      - if: steps.tag.outputs.new == 'true'
+        name: Run the tests
+        run: go test ./...
+
+      - if: steps.tag.outputs.new == 'true'
+        name: Tag the version
+        env:
+          VERSION: ${{ steps.tag.outputs.version }}
+        run: |
+          git tag "v$VERSION"
+          git push origin "v$VERSION"
+
+      - if: steps.tag.outputs.new == 'true'
+        name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v6
         with:
           version: "~> v2"
           args: release --clean
         env:
-          # Provided automatically by Actions; grants the release upload above.
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

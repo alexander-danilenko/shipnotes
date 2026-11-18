@@ -22,11 +22,11 @@ import (
 	"github.com/alexander-danilenko/shipnotes/internal/cli"
 )
 
-// version is the release identifier reported by `shipnotes --version`. It is
-// "dev" for local builds and overwritten at release time by the linker
-// (`-ldflags "-X main.version=..."`), which is how GoReleaser stamps the git
-// tag into the published binaries.
-var version = "dev"
+// version is the semantic version (semver.org) reported by `shipnotes --version`.
+// It is the one source of the release version: when a push to main changes it,
+// .github/workflows/release.yml tags v<version> and GoReleaser publishes the
+// release (see "Releases" in CLAUDE.md).
+const version = "0.5.0"
 
 func main() {
 	os.Exit(cli.Run(os.Args[1:], version))
