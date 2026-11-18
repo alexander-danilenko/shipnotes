@@ -17,3 +17,7 @@ dist/
 .idea/
 .vscode/
 .DS_Store
+
+# Compound Engineering plans and brainstorms: scratch for in-flight features; outcomes go through /ce-compound.
+docs/plans/
+docs/brainstorms/

@@ -127,6 +127,12 @@ shipnotes/
                                       #   debugging in documented areas.
 ```
 
+## Plans vs. solutions
+
+`docs/plans/` and `docs/brainstorms/` are gitignored scratch: a plan or brainstorm is useful only while its feature is being built, and it is not kept afterwards. Every lasting outcome goes through `/ce-compound` into `docs/solutions/` (or into `ARCHITECTURE.md`, `CONCEPTS.md`, a test, or a lint rule).
+
+**A solution doc never references a plan or a brainstorm.** It will not exist for the next reader. Write the relevant point into the solution doc itself.
+
 ## The golden-file strategy
 
 `testdata/cases/*.json` are sample inputs (each one is a serialized `notes.ReleaseNotes`). `testdata/golden/*.golden` are the **exact** Markdown the template produces for those inputs. `internal/infrastructure/markdown/renderer_test.go` renders each case and asserts the bytes match its golden file. This is how an unintended rendering change is caught.

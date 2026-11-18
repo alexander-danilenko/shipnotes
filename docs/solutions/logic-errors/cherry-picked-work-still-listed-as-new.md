@@ -82,4 +82,4 @@ Both new signals are intra-range equivalence, so nothing outside the reported ra
 ## Related Issues
 
 - `ARCHITECTURE.md` §9 carries both decision rows — reading the trailer from the release branch, and pairing duplicates inside the range — with the scope boundaries stated.
-- `docs/plans/2026-08-13-001-feat-skip-already-shipped-cherry-picks-plan.md` lines 113 and 114 record the two scope boundaries this work reopened; the assumption at line 114 ("it never occurs in the target workflow") did not hold.
+- The gate's original design (2026-08-13) left out two cases, and this work reopened both: patch-id equivalence for picks made without `-x`, and duplicates whose two copies both sit in the range. The second was left out because "it never occurs in the target workflow", and that assumption did not hold.
