@@ -127,6 +127,12 @@ shipnotes/
                                       #   debugging in documented areas.
 ```
 
+## Plans vs. solutions
+
+`docs/plans/` and `docs/brainstorms/` are gitignored scratch: a plan or brainstorm is useful only while its feature is being built, and it is not kept afterwards. Every lasting outcome goes through `/ce-compound` into `docs/solutions/` (or into `ARCHITECTURE.md`, `CONCEPTS.md`, a test, or a lint rule).
+
+**A solution doc never references a plan or a brainstorm.** It will not exist for the next reader. Write the relevant point into the solution doc itself.
+
 ## The golden-file strategy
 
 `testdata/cases/*.json` are sample inputs (each one is a serialized `notes.ReleaseNotes`). `testdata/golden/*.golden` are the **exact** Markdown the template produces for those inputs. `internal/infrastructure/markdown/renderer_test.go` renders each case and asserts the bytes match its golden file. This is how an unintended rendering change is caught.
@@ -170,6 +176,14 @@ Then review the resulting diff before committing it — the diff *is* the record
 - **Pointer for "optional":** `*SummaryData` can be `nil`, which the template reads as "no summary section."
 - **Struct tags:** the `` `json:"..."` `` text on struct fields maps Go field names to JSON keys. Ours intentionally match the Jira API (for the `jira` types) and the on-disk golden-test fixtures (for the `notes` model), so do not "tidy" them.
 - **`text/template` whitespace:** `{{-` trims spaces/newlines before a tag and `-}}` trims after. That is how the template controls exact blank lines — the golden tests will catch any mistake.
+
+## Releases
+
+`const version` in `main.go` holds the [semver](https://semver.org) version that `shipnotes --version` reports. It is the one source of the release version.
+
+- A commit that changes what ships (non-test `.go` files, `go.mod`, the embedded template) bumps it in the same commit. Any other commit leaves it alone, since each bump publishes a release.
+- `feat` → minor (`0.4.2` → `0.5.0`). Every other type → patch (`0.4.0` → `0.4.1`). A breaking change (`!`) → major once past `1.0.0`.
+- A bump reaching `main` is a release: `.github/workflows/release.yml` runs the tests, tags `v<version>`, and GoReleaser (`.goreleaser.yaml`) publishes the GitHub Release. Never tag by hand. Try the config locally with `goreleaser release --snapshot --clean`.
 
 ## Git conventions
 

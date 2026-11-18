@@ -4,7 +4,7 @@
 # Session scratch buffer (machine-local; docs/ is tracked).
 .remember/
 
-# Machine-local Compound Engineering settings (the .example.yaml is tracked).
+# Machine-local Compound Engineering settings (the shared config.yaml is tracked).
 .compound-engineering/*.local.yaml
 
 # GoReleaser build output (local `goreleaser build/release` runs).
@@ -17,3 +17,7 @@ dist/
 .idea/
 .vscode/
 .DS_Store
+
+# Compound Engineering plans and brainstorms: scratch for in-flight features; outcomes go through /ce-compound.
+docs/plans/
+docs/brainstorms/
