@@ -32,13 +32,9 @@ builds:
 
 archives:
   - id: shipnotes
-    # e.g. shipnotes_1.2.0_linux_amd64.tar.gz
-    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
-    formats: [tar.gz]
-    # Windows users expect a .zip rather than a .tar.gz.
-    format_overrides:
-      - goos: windows
-        formats: [zip]
+    # e.g. shipnotes_1.2.0_macos_arm64.zip — "macos" reads better than Go's "darwin".
+    name_template: '{{ .ProjectName }}_{{ .Version }}_{{ replace .Os "darwin" "macos" }}_{{ .Arch }}'
+    formats: [zip]
     files:
       - README.md
       - LICENSE*
