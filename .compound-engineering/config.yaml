@@ -1,0 +1,11 @@
+# Compound Engineering -- shared project config (tracked).
+# Every available setting, with its default, is documented in the plugin's example:
+# https://github.com/EveryInc/compound-engineering-plugin/blob/main/.compound-engineering/config.example.yaml
+
+# Plans, learnings and other CE output. The root .gitignore keeps docs/ out of git.
+docs_root: docs
+# The team runs Claude Code only, so ce-code-review and ce-doc-review send no diff to a second model.
+cross_model_review_mode: off
+# After /ce-commit-push-pr opens a PR, do not start /ce-babysit-pr, which watches CI and reviews and pushes fixes until the PR is ready to merge.
+# The developer decides when to handle CI and review feedback. To watch one PR, run /ce-babysit-pr with its number.
+auto_babysit: false
