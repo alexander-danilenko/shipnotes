@@ -177,10 +177,5 @@ func resolve(override, envName string) string {
 // AsValidationError unwraps err into a *ValidationError when possible, so the
 // caller can print the per-field details.
 func AsValidationError(err error) (*ValidationError, bool) {
-	var validationErr *ValidationError
-	if errors.As(err, &validationErr) {
-		return validationErr, true
-	}
-
-	return nil, false
+	return errors.AsType[*ValidationError](err)
 }

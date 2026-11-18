@@ -160,8 +160,7 @@ func TestLoadByKeysMalformedJSON(t *testing.T) {
 
 	_, err := newTestClient(server.URL).LoadByKeys(context.Background(), []string{"PROJ-1"})
 
-	var netErr *NetworkError
-	if !errors.As(err, &netErr) {
+	if _, ok := errors.AsType[*NetworkError](err); !ok {
 		t.Fatalf("expected *NetworkError for bad JSON, got %T (%v)", err, err)
 	}
 }
